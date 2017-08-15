@@ -1,0 +1,27 @@
+{
+    "compilerOptions": {
+        "module": "commonjs",
+        "removeComments": true,
+        "preserveConstEnums": true,
+        "experimentalDecorators": true,
+        "strictNullChecks": true,
+        "noImplicitAny": true,
+        "target": "es6",
+        "lib": [
+            "es6"
+        ],
+        "pretty": true,
+        "outDir": "build",
+        "sourceMap": true,
+        "rootDir": "src",
+        "typeRoots": [
+            "node_modules/@types",
+            "typings"
+        ]
+    },
+    "include": [
+        "src/**/*"
+    ],
+    "exclude": [
+    ]
+}

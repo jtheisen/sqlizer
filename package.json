@@ -1,0 +1,16 @@
+{
+  "name": "blueprint-play",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/app.bundle.js",
+  "scripts": {
+    "build": "tsc && webpack"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {},
+  "dependencies": {
+    "@types/tape": "^4.2.30",
+    "tape": "^4.8.0"
+  }
+}
