@@ -153,19 +153,36 @@ type Predicate = Scalar<boolean> & {
 
 var SqlTrue: Predicate;
 
-interface SqlSet<E> {
+
+class SqlSet<E> {
     //dontuse: E // why is this necessary?
 
-    where(p: (e: Scalar<E>) => Predicate): SqlSet<E>;
+    constructor(private expression: SelectExpression) {
+    }
+
+    join<E2>(s2: SqlSet<E2>): JoinStep2<E, E2>
+    {
+
+    }
+    
+    where(p: (e: Scalar<E>) => Predicate): SqlSet<E>
+    {
+
+    }
 
     map<T>(f: (e: Scalar<E>) => Scalar<T>): SqlSet<T>;
-
-    join<E2>(s2: SqlSet<E2>): JoinStep2<E, E2>;
 
     group<T>(f: (e: E) => T): GroupStep<E, T>;
     // shortcut
     groupby<K>(p: (e: E) => K): SqlSet<Grouping<E, K>>;
 }
+
+class ConcreteSqlSet<E> {
+    constructor() {
+
+    }
+}
+
 
 interface GroupStep<E, T> {
     by<K>(p: (e: E) => K): SqlSet<Grouping<E, K>>
@@ -175,12 +192,14 @@ interface Grouping<G, K> extends SqlSet<G> {
     key: K;
 }
 
-interface JoinStep2<E, E2> {
-    on(c: (e: E, e2: E2) => boolean): JoinStep3<E, E2>;
-}
+class JoinStep2<E, E2> {
 
-interface JoinStep3<E, E2> {
-    map<T>(f: (e: E, e2: E2) => T) : SqlSet<T>;
+    constructor(private s2: SqlSet<E2>) { }
+
+    on(c: (e: E, e2: E2) => boolean): SqlSet<[E, E2]>
+    {
+        
+    }
 }
 
 function from<E>(entity: E): SqlSet<E> { throw null; }
@@ -196,11 +215,48 @@ var myCities: SqlSet<City>;
 
 var myEntity = new Entity();
 
-var x = myEntities.where(e => e.age.eq(immediate(32))).join(myCities).on((e, c) => e.name == c.name).map((e, e2) => e.age + e2.name);
-var y = myEntities.where(e => SqlTrue
-    .and(e.eq(e))
-    .and(e.eq(e))
-    .and(e.in(myEntities)
-        .and(e.in([myEntity]))));
 
+var evaluationStack: {
+    expression: SelectExpression
+}[] = [];
 
+function getCurrentEvaluation() {
+    return evaluationStack[evaluationStack.length - 1]
+}
+
+function query<E>(monad: () => E[]) {
+    evaluationStack.push({ expression: new SelectExpression() })
+    try {
+        var result = monad()
+
+        var evaluation = getCurrentEvaluation();
+
+        
+    }
+    finally {
+        evaluationStack.pop();
+    }
+}
+
+function from<S>(source: SqlSet<S>) {
+    var evaluation = getCurrentEvaluation();
+    var aliased = new AliasedSetExpression();
+    aliased.alias = 'some-alias';
+    evaluation.expression.from = source.xxx
+}
+
+function where<S>(predicate: Predicate) {
+    var evaluation = getCurrentEvaluation()
+    var expression predicate.buildExpression()
+    evaluation.expression.where = expression
+}
+
+var myQuery = query(() =>
+{
+    var x = from(myEntities);
+    var y = join(myCities).on(c => x.city.id.eq(c.id));
+
+    where();
+
+    return [x, y];
+})
