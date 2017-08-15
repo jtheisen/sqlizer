@@ -180,16 +180,16 @@ interface JoinStep2<E, E2> {
 }
 
 interface JoinStep3<E, E2> {
-    map<T>(f: (e: E, e2: E2) => T);
+    map<T>(f: (e: E, e2: E2) => T) : SqlSet<T>;
 }
 
-function from<E>(entity: E): SqlSet<E> { return null; }
+function from<E>(entity: E): SqlSet<E> { throw null; }
 
 function map<E, T>(source: SqlSet<E>, f: (e: E) => T): SqlSet<T> {
-    return null;
+    throw null;
 }
 
-function immediate<T>(value: T): Scalar<T> { return null; }
+function immediate<T>(value: T): Scalar<T> { throw null; }
 
 var myEntities: SqlSet<Entity>;
 var myCities: SqlSet<City>;
