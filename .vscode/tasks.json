@@ -12,6 +12,14 @@
             }
         },
         {
+            "type": "npm",
+            "script": "test",
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            }
+        },
+        {
             "taskName": "webserver",
             "command": "gulp",
             "group": {

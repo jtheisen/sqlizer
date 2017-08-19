@@ -1,4 +1,11 @@
-import { AliasedSetExpression, JoinExpression, ScalarExpression, SelectExpression, SetExpression } from './expression';
+import {
+    FromExpression,
+    JoinExpression,
+    NamedSetExpression,
+    ScalarExpression,
+    SelectExpression,
+    SetExpression,
+} from './expression';
 
 
 class ConcreteScalar<T>
@@ -9,22 +16,27 @@ class ConcreteScalar<T>
     }
 }
 
+interface X<T> {
+    [P in keyof T]: X<T>    
+}
+
+class ScalarFluents<T> {
+    value: T;
+  
+
+    add(rhs: Scalar<T>): Scalar<T> { throw 0 }
+    eq(rhs: Scalar<T>): Predicate { throw 0 }
+    // ne(rhs: Scalar<T>): Predicate;
+    // lt(rhs: Scalar<T>): Predicate;
+    // gt(rhs: Scalar<T>): Predicate;
+    // le(rhs: Scalar<T>): Predicate;
+    // ge(rhs: Scalar<T>): Predicate;
+
+    // in(rhs: SqlSet<T> | T[]): Predicate;    
+}
+
 // The point being that this prohibits unwittingly calling inappropriate functions in query expressions.
-export type Scalar<T> = {
-    [P in keyof T]: Scalar<T[P]>;
-} & {
-        value: T;
-
-        add(rhs: Scalar<T>): Scalar<T>;
-        eq(rhs: Scalar<T>): Predicate;
-        ne(rhs: Scalar<T>): Predicate;
-        lt(rhs: Scalar<T>): Predicate;
-        gt(rhs: Scalar<T>): Predicate;
-        le(rhs: Scalar<T>): Predicate;
-        ge(rhs: Scalar<T>): Predicate;
-
-        in(rhs: SqlSet<T> | T[]): Predicate;
-    }
+//export type Scalar<T> = { [P in keyof T]: Scalar<T[P]> } //& ScalarFluents<T>
 
 type Predicate = Scalar<boolean> & {
     and(rhs: Predicate): Predicate;
@@ -35,56 +47,49 @@ var SqlTrue: Predicate;
 
 
 export class SqlSet<E> {
+    constructor(public expression: SetExpression) {
+    }
 }
 
-class ConcreteSqlSet<E> extends SqlSet<E> {
-    constructor(public expression: SetExpression) {
-        super()
-    }
+export function defineTable<E>(name: string): SqlSet<E> {
+    var expression = new NamedSetExpression()
+    expression.name = name
+    return new SqlSet(expression)
 }
 
 function immediate<T>(value: T): Scalar<T> { throw null; }
 
 
-
-declare function scalar<E>(element: E): Scalar<E>;
-declare function scalar<E>(element: Scalar<E>): Scalar<E>;
-
-var x = scalar
-
-// function scalar<E>(element: E): Scalar<E> {
-//     return element as any as Scalar<E>
-// }
+var scalar: {
+    <E>(element: E): Scalar<E>,
+    <E>(element: Scalar<E>): Scalar<E>,
+} = (e: any) => e
 
 
-
-
-function makeAliasedSetExpression<T>(source: SqlSet<T>) {
-    var aliased = new AliasedSetExpression();
-    aliased.set = getSetExpression(source)
-    return aliased
-}
-
-
-export function from<S>(source: SqlSet<S>) {
+export function from<S>(source: SqlSet<S>): Scalar<S> {
     var evaluation = getCurrentEvaluation();
-    evaluation.expression.from = makeAliasedSetExpression(source)
-    return new ConcreteScalar<S>(getSetExpression(source)) as any as Scalar<S>;
+    evaluation.expression.from = new FromExpression()
+    evaluation.expression.from.source = getSetExpression(source)
+    return new ConcreteScalar<S>(evaluation.expression.from.source) as any as Scalar<S>;
 }
 
-export function join<S>(source: SqlSet<S>, condition: (s: Scalar<S>) => Predicate): Scalar<S>
-{
-    var evaluation = getCurrentEvaluation();
-
-    var joinExpression = new JoinExpression()
-    joinExpression.source = makeAliasedSetExpression(source)
-    joinExpression.kind = 'join'
-    //joinExpression.on = getPredicate(condition)
-
-    evaluation.expression.joins.push(joinExpression)
-
-    return new ConcreteScalar<S>(getSetExpression(source)) as any as Scalar<S>
+export function join<S>(source: SqlSet<S>): { on: (condition: (s: Scalar<S>) => Predicate) => Scalar<S> } {
+    return {
+        on: (condition: (s: Scalar<S>) => Predicate) => {
+            var evaluation = getCurrentEvaluation();
+            
+                var joinExpression = new JoinExpression()
+                joinExpression.source = getSetExpression(source)
+                joinExpression.kind = 'join'
+                //joinExpression.on = getPredicate(condition)
+            
+                evaluation.expression.joins.push(joinExpression)
+            
+                return new ConcreteScalar<S>(joinExpression.source) as any as Scalar<S>                        
+        }
+    }
 }
+
 
 
 
@@ -108,7 +113,7 @@ export var query: {
 
         var evaluation = getCurrentEvaluation();
 
-        return new ConcreteSqlSet<E>(evaluation.expression)
+        return new SqlSet<E>(evaluation.expression)
     }
     finally {
         evaluationStack.pop();
@@ -116,5 +121,5 @@ export var query: {
 }
 
 function getSetExpression<T>(source: SqlSet<T>): SetExpression {
-    return (source as ConcreteSqlSet<T>).expression
+    return (source as SqlSet<T>).expression
 }

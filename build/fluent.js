@@ -2,35 +2,43 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const expression_1 = require("./expression");
 class ConcreteScalar {
-    constructor() {
+    constructor(expression) {
+        this.expression = expression;
     }
 }
 var SqlTrue;
 class SqlSet {
+    constructor(expression) {
+        this.expression = expression;
+    }
 }
 exports.SqlSet = SqlSet;
-class ConcreteSqlSet extends SqlSet {
+function defineTable(name) {
+    var expression = new expression_1.NamedSetExpression();
+    expression.name = name;
+    return new SqlSet(expression);
 }
+exports.defineTable = defineTable;
 function immediate(value) { throw null; }
-var x = scalar;
-function makeAliasedSetExpression(source) {
-    var aliased = new expression_1.AliasedSetExpression();
-    aliased.set = getSetExpression(source);
-    return aliased;
-}
+var scalar = (e) => e;
 function from(source) {
     var evaluation = getCurrentEvaluation();
-    evaluation.expression.from = makeAliasedSetExpression(source);
-    return new ConcreteScalar();
+    evaluation.expression.from = new expression_1.FromExpression();
+    evaluation.expression.from.source = getSetExpression(source);
+    return new ConcreteScalar(evaluation.expression.from.source);
 }
 exports.from = from;
-function join(source, condition) {
-    var evaluation = getCurrentEvaluation();
-    var joinExpression = new expression_1.JoinExpression();
-    joinExpression.source = makeAliasedSetExpression(source);
-    joinExpression.kind = 'join';
-    evaluation.expression.joins.push(joinExpression);
-    return new ConcreteScalar();
+function join(source) {
+    return {
+        on: (condition) => {
+            var evaluation = getCurrentEvaluation();
+            var joinExpression = new expression_1.JoinExpression();
+            joinExpression.source = getSetExpression(source);
+            joinExpression.kind = 'join';
+            evaluation.expression.joins.push(joinExpression);
+            return new ConcreteScalar(joinExpression.source);
+        }
+    };
 }
 exports.join = join;
 var evaluationStack = [];
@@ -42,10 +50,13 @@ exports.query = (monad) => {
     try {
         var result = monad();
         var evaluation = getCurrentEvaluation();
-        return new ConcreteSqlSet();
+        return new SqlSet(evaluation.expression);
     }
     finally {
         evaluationStack.pop();
     }
 };
+function getSetExpression(source) {
+    return source.expression;
+}
 //# sourceMappingURL=fluent.js.map

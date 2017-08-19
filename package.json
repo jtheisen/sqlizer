@@ -4,13 +4,15 @@
   "description": "",
   "main": "dist/app.bundle.js",
   "scripts": {
-    "build": "tsc && webpack"
+    "build": "tsc && webpack",
+    "test": "node dist/app.bundle.js"
   },
   "author": "",
   "license": "ISC",
   "devDependencies": {},
   "dependencies": {
     "@types/tape": "^4.2.30",
-    "tape": "^4.8.0"
+    "tape": "^4.8.0",
+    "webpack": "^3.5.5"
   }
 }

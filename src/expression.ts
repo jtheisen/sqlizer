@@ -23,7 +23,7 @@ export class ImmediateSetExpression extends SetExpression {
 export class SelectExpression {
     from: FromExpression
 
-    joins: JoinExpression[]
+    joins: JoinExpression[] = []
 
     where: PredicateExpression
 
@@ -109,23 +109,24 @@ export class NotExpression extends PredicateExpression {
 
 
 class ExpressionVisitor {
+    VisitSelectExpression(expression: SelectExpression) { throw this.NotImplemented }
     VisitSetExpression(expression: SetExpression) {
         if (expression instanceof NamedSetExpression)
             this.VisitNamedExpression(expression)
         else if (expression instanceof QueriedSetExpression)
-            this.VisitQueriesExpression(expression)
+            this.VisitQueriedExpression(expression)
         else
-            this.notimplemented()
+            throw this.NotImplemented
     }
-    VisitNamedExpression(expression: NamedSetExpression) { this.notimplemented() }
-    //VisitImmediateExpression(expression: ImmediateSetExpression) { this.notimplemented() }
-    VisitQueriesExpression(expression: QueriedSetExpression) { this.notimplemented() }
+    VisitQueriedExpression(expression: QueriedSetExpression) { throw this.NotImplemented }
+    VisitNamedExpression(expression: NamedSetExpression) { throw this.NotImplemented }
+    //VisitImmediateExpression(expression: ImmediateSetExpression) { throw this.NotImplemented }
 
     VisitScalarExpression(expression: ScalarExpression) {
         if (expression instanceof BindingExpression)
             this.VisitBindingExpression(expression)
         else
-            this.notimplemented()
+            throw this.NotImplemented
     }
     VisitBindingExpression(expression: BindingExpression) {
         if (expression instanceof FromExpression)
@@ -133,15 +134,14 @@ class ExpressionVisitor {
         else if (expression instanceof JoinExpression)
             this.VisitJoinExpression(expression)
         else
-            this.notimplemented()
+            throw this.NotImplemented
     }
-    VisitFromExpression(expression: FromExpression) { this.notimplemented() }
-    VisitJoinExpression(expression: JoinExpression) { this.notimplemented() }
+    VisitFromExpression(expression: FromExpression) { throw this.NotImplemented }
+    VisitJoinExpression(expression: JoinExpression) { throw this.NotImplemented }
 
-    VisitPredicateExpression(expression: PredicateExpression) { this.notimplemented() }
-    VisitSelectExpression(expression: SelectExpression) { this.notimplemented() }
-    
-    private notimplemented() { throw "not implemented" }
+    VisitPredicateExpression(expression: PredicateExpression) { throw this.NotImplemented }
+
+    private NotImplemented = "not implemented"
 }
 
 class PrintVisitor extends ExpressionVisitor {
@@ -164,6 +164,16 @@ class PrintVisitor extends ExpressionVisitor {
         this.VisitPredicateExpression(expression.on)
     }
 
+    VisitQueriedExpression(expression: QueriedSetExpression) {
+        this.write('(')
+        this.VisitSelectExpression(expression.definition)
+        this.write(')')
+    }
+
+    VisitNamedExpression(expression: NamedSetExpression) {
+        this.write(expression.name)
+    }
+
     VisitPredicateExpression(expression: PredicateExpression) {
         this.write('bla')
     }
@@ -173,7 +183,7 @@ class PrintVisitor extends ExpressionVisitor {
     }
 }
 
-function sqlize(source: SetExpression) {
+export function sqlify(source: SetExpression) {
     var visitor = new PrintVisitor()
     visitor.VisitSetExpression(source)
 }

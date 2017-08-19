@@ -1,4 +1,6 @@
-import { from, join, query, SqlSet } from './fluent';
+import { sqlify } from './expression';
+import { defineTable, from, join, query, SqlSet } from './fluent';
+import * as tape from 'tape';
 
 /*
 
@@ -29,8 +31,8 @@ class City {
     name: string
 }
 
-var myEntities: SqlSet<Entity>;
-var myCities: SqlSet<City>;
+var myEntities: SqlSet<Entity> = defineTable("myEntities");
+var myCities: SqlSet<City> = defineTable("myCities");
 
 var myEntity = new Entity();
 
@@ -38,9 +40,15 @@ var myEntity = new Entity();
 var myQuery = query(() =>
 {
     var x = from(myEntities);
-    var y = join(myCities, c => x.city.name.eq(c.name));
+    var y = join(myCities).on(c => x.city.name.eq(c.name));
 
     var p = { e: x, c: y }
 
     return p;
 })
+
+sqlify(myQuery.expression)
+
+// tape('', t => {
+// }
+// )
