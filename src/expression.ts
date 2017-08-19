@@ -1,7 +1,7 @@
 // aliased set/view/cte or query/subquery
-export class AliasedSetExpression {
-    set: SetExpression
-}
+// export class AliasedSetExpression {
+//     set: SetExpression
+// }
 
 // table/view/cte
 export class SetExpression {
@@ -21,7 +21,7 @@ export class ImmediateSetExpression extends SetExpression {
 
 // query/subquery
 export class SelectExpression {
-    from: AliasedSetExpression
+    from: FromExpression
 
     joins: JoinExpression[]
 
@@ -105,4 +105,75 @@ export class LogicalBinaryExpression extends PredicateExpression {
 
 export class NotExpression extends PredicateExpression {
     operand: PredicateExpression
+}
+
+
+class ExpressionVisitor {
+    VisitSetExpression(expression: SetExpression) {
+        if (expression instanceof NamedSetExpression)
+            this.VisitNamedExpression(expression)
+        else if (expression instanceof QueriedSetExpression)
+            this.VisitQueriesExpression(expression)
+        else
+            this.notimplemented()
+    }
+    VisitNamedExpression(expression: NamedSetExpression) { this.notimplemented() }
+    //VisitImmediateExpression(expression: ImmediateSetExpression) { this.notimplemented() }
+    VisitQueriesExpression(expression: QueriedSetExpression) { this.notimplemented() }
+
+    VisitScalarExpression(expression: ScalarExpression) {
+        if (expression instanceof BindingExpression)
+            this.VisitBindingExpression(expression)
+        else
+            this.notimplemented()
+    }
+    VisitBindingExpression(expression: BindingExpression) {
+        if (expression instanceof FromExpression)
+            this.VisitFromExpression(expression)
+        else if (expression instanceof JoinExpression)
+            this.VisitJoinExpression(expression)
+        else
+            this.notimplemented()
+    }
+    VisitFromExpression(expression: FromExpression) { this.notimplemented() }
+    VisitJoinExpression(expression: JoinExpression) { this.notimplemented() }
+
+    VisitPredicateExpression(expression: PredicateExpression) { this.notimplemented() }
+    VisitSelectExpression(expression: SelectExpression) { this.notimplemented() }
+    
+    private notimplemented() { throw "not implemented" }
+}
+
+class PrintVisitor extends ExpressionVisitor {
+    VisitSelectExpression(expression: SelectExpression) {
+        this.write('SELECT')
+        this.VisitFromExpression(expression.from)
+        for (var join of expression.joins)
+            this.VisitJoinExpression(join)
+    }
+
+    VisitFromExpression(expression: FromExpression) {
+        this.write('FROM')
+        this.VisitSetExpression(expression.source)
+    }
+
+    VisitJoinExpression(expression: JoinExpression) {
+        this.write(expression.kind)
+        this.VisitSetExpression(expression.source)
+        this.write('ON')
+        this.VisitPredicateExpression(expression.on)
+    }
+
+    VisitPredicateExpression(expression: PredicateExpression) {
+        this.write('bla')
+    }
+
+    write(text: string) {
+        console.info(text)
+    }
+}
+
+function sqlize(source: SetExpression) {
+    var visitor = new PrintVisitor()
+    visitor.VisitSetExpression(source)
 }
