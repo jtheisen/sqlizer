@@ -56,7 +56,9 @@ exports.query = (monad) => {
     try {
         var result = monad();
         var evaluation = getCurrentEvaluation();
-        return new SqlSet(evaluation.expression);
+        var setExpression = new expression_1.QueriedSetExpression();
+        setExpression.definition = evaluation.expression;
+        return new SqlSet(setExpression);
     }
     finally {
         evaluationStack.pop();

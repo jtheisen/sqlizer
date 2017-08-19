@@ -2,6 +2,7 @@ import {
     FromExpression,
     JoinExpression,
     NamedSetExpression,
+    QueriedSetExpression,
     ScalarExpression,
     SelectExpression,
     SetExpression,
@@ -31,10 +32,11 @@ class ConcreteScalar<T> {
 //export type Scalar<T> = { [P in keyof T]: Scalar<T[P]> } & ConcreteScalar<T>
 
 export type ScalarN<T> = { [P in keyof T]: ScalarN<T[P]> } & ConcreteScalar<T>
-export type Scalar1<T> = { [P in keyof T]: ScalarN<T[P]> } & ConcreteScalar<T>
+export type Scalar4<T> = { [P in keyof T]: ScalarN<T[P]> } & ConcreteScalar<T>
+export type Scalar3<T> = { [P in keyof T]: Scalar4<T[P]> } & ConcreteScalar<T>
+export type Scalar2<T> = { [P in keyof T]: Scalar3<T[P]> } & ConcreteScalar<T>
+export type Scalar1<T> = { [P in keyof T]: Scalar2<T[P]> } & ConcreteScalar<T>
 export type Scalar<T> = { [P in keyof T]: Scalar1<T[P]> } & ConcreteScalar<T>
-
-//var x: Scalar<{ x: number }> = undefined as any
 
 class Predicate {
     and(rhs: Predicate): Predicate { throw 0 }
@@ -111,7 +113,10 @@ export var query: {
 
         var evaluation = getCurrentEvaluation();
 
-        return new SqlSet<E>(evaluation.expression)
+        var setExpression = new QueriedSetExpression()
+        setExpression.definition = evaluation.expression
+
+        return new SqlSet<E>(setExpression)
     }
     finally {
         evaluationStack.pop();

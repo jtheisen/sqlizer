@@ -232,7 +232,10 @@ var myEntities = fluent_1.defineTable("myEntities");
 var myCities = fluent_1.defineTable("myCities");
 var myEntity = new Entity();
 var myQuery = fluent_1.query(() => {
-    var e = fluent_1.from(myEntities);
+    var x = fluent_1.from(myEntities);
+    var y = fluent_1.join(myCities).on(c => x.city.name.eq(c.name));
+    var p = { e: x, c: y };
+    return p;
 });
 expression_1.sqlify(myQuery.expression);
 //# sourceMappingURL=app.js.map
@@ -300,7 +303,9 @@ exports.query = (monad) => {
     try {
         var result = monad();
         var evaluation = getCurrentEvaluation();
-        return new SqlSet(evaluation.expression);
+        var setExpression = new expression_1.QueriedSetExpression();
+        setExpression.definition = evaluation.expression;
+        return new SqlSet(setExpression);
     }
     finally {
         evaluationStack.pop();
