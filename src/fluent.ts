@@ -8,22 +8,14 @@ import {
 } from './expression';
 
 
-class ConcreteScalar<T>
-{
-    value: T
 
-    constructor(public expression: ScalarExpression) {
+class ConcreteScalar<T> {
+    constructor(public set: SetExpression) {
+
     }
-}
 
-interface X<T> {
-    [P in keyof T]: X<T>    
-}
-
-class ScalarFluents<T> {
     value: T;
   
-
     add(rhs: Scalar<T>): Scalar<T> { throw 0 }
     eq(rhs: Scalar<T>): Predicate { throw 0 }
     // ne(rhs: Scalar<T>): Predicate;
@@ -36,11 +28,17 @@ class ScalarFluents<T> {
 }
 
 // The point being that this prohibits unwittingly calling inappropriate functions in query expressions.
-//export type Scalar<T> = { [P in keyof T]: Scalar<T[P]> } //& ScalarFluents<T>
+//export type Scalar<T> = { [P in keyof T]: Scalar<T[P]> } & ConcreteScalar<T>
 
-type Predicate = Scalar<boolean> & {
-    and(rhs: Predicate): Predicate;
-    or(rhs: Predicate): Predicate;
+export type ScalarN<T> = { [P in keyof T]: ScalarN<T[P]> } & ConcreteScalar<T>
+export type Scalar1<T> = { [P in keyof T]: ScalarN<T[P]> } & ConcreteScalar<T>
+export type Scalar<T> = { [P in keyof T]: Scalar1<T[P]> } & ConcreteScalar<T>
+
+//var x: Scalar<{ x: number }> = undefined as any
+
+class Predicate {
+    and(rhs: Predicate): Predicate { throw 0 }
+    or(rhs: Predicate): Predicate { throw 0 }
 }
 
 var SqlTrue: Predicate;

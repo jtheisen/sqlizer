@@ -232,10 +232,7 @@ var myEntities = fluent_1.defineTable("myEntities");
 var myCities = fluent_1.defineTable("myCities");
 var myEntity = new Entity();
 var myQuery = fluent_1.query(() => {
-    var x = fluent_1.from(myEntities);
-    var y = fluent_1.join(myCities).on(c => x.city.name.eq(c.name));
-    var p = { e: x, c: y };
-    return p;
+    var e = fluent_1.from(myEntities);
 });
 expression_1.sqlify(myQuery.expression);
 //# sourceMappingURL=app.js.map
@@ -249,9 +246,15 @@ expression_1.sqlify(myQuery.expression);
 Object.defineProperty(exports, "__esModule", { value: true });
 const expression_1 = __webpack_require__(0);
 class ConcreteScalar {
-    constructor(expression) {
-        this.expression = expression;
+    constructor(set) {
+        this.set = set;
     }
+    add(rhs) { throw 0; }
+    eq(rhs) { throw 0; }
+}
+class Predicate {
+    and(rhs) { throw 0; }
+    or(rhs) { throw 0; }
 }
 var SqlTrue;
 class SqlSet {

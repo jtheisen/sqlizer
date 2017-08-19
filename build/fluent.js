@@ -2,9 +2,15 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const expression_1 = require("./expression");
 class ConcreteScalar {
-    constructor(expression) {
-        this.expression = expression;
+    constructor(set) {
+        this.set = set;
     }
+    add(rhs) { throw 0; }
+    eq(rhs) { throw 0; }
+}
+class Predicate {
+    and(rhs) { throw 0; }
+    or(rhs) { throw 0; }
 }
 var SqlTrue;
 class SqlSet {
