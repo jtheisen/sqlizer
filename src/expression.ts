@@ -109,39 +109,45 @@ export class NotExpression extends PredicateExpression {
 
 
 class ExpressionVisitor {
-    VisitSelectExpression(expression: SelectExpression) { throw this.NotImplemented }
-    VisitSetExpression(expression: SetExpression) {
+    visitSelectExpression(expression: SelectExpression) {
+        this.visitFromExpression(expression.from)
+        for (var join of expression.joins)
+            this.visitJoinExpression(join)
+    }
+    visitSetExpression(expression: SetExpression) {
         if (expression instanceof NamedSetExpression)
-            this.VisitNamedExpression(expression)
+            this.visitNamedExpression(expression)
         else if (expression instanceof QueriedSetExpression)
-            this.VisitQueriedExpression(expression)
+            this.visitQueriedExpression(expression)
         else
-            throw this.NotImplemented
+            this.unconsidered()
     }
-    VisitQueriedExpression(expression: QueriedSetExpression) { throw this.NotImplemented }
-    VisitNamedExpression(expression: NamedSetExpression) { throw this.NotImplemented }
-    //VisitImmediateExpression(expression: ImmediateSetExpression) { throw this.NotImplemented }
+    visitQueriedExpression(expression: QueriedSetExpression) {
+        this.visitSelectExpression(expression.definition)
+    }
+    visitNamedExpression(expression: NamedSetExpression) { this.unconsidered() }
+    //visitImmediateExpression(expression: ImmediateSetExpression) { this.unconsidered() }
 
-    VisitScalarExpression(expression: ScalarExpression) {
+    visitScalarExpression(expression: ScalarExpression) {
         if (expression instanceof BindingExpression)
-            this.VisitBindingExpression(expression)
+            this.visitBindingExpression(expression)
         else
-            throw this.NotImplemented
+            this.unconsidered()
     }
-    VisitBindingExpression(expression: BindingExpression) {
+    visitBindingExpression(expression: BindingExpression) {
         if (expression instanceof FromExpression)
-            this.VisitFromExpression(expression)
+            this.visitFromExpression(expression)
         else if (expression instanceof JoinExpression)
-            this.VisitJoinExpression(expression)
+            this.visitJoinExpression(expression)
         else
-            throw this.NotImplemented
+            this.unconsidered()
     }
-    VisitFromExpression(expression: FromExpression) { throw this.NotImplemented }
-    VisitJoinExpression(expression: JoinExpression) { throw this.NotImplemented }
+    visitFromExpression(expression: FromExpression) { this.unconsidered() }
+    visitJoinExpression(expression: JoinExpression) { this.unconsidered() }
 
-    VisitPredicateExpression(expression: PredicateExpression) { throw this.NotImplemented }
+    visitPredicateExpression(expression: PredicateExpression) { this.unconsidered() }
 
-    private NotImplemented = "not implemented"
+    unconsidered() { }
 }
 
 interface Run {
@@ -178,63 +184,130 @@ function stringify(run: Run) {
     return parts.join(" ")
 }
 
+class BindingCollectorVisitor extends ExpressionVisitor {
+    private bindingExpressions: BindingExpression[] = []
+
+    static getBindings(expression: SetExpression) {
+        var self = new BindingCollectorVisitor()
+        self.visitSetExpression(expression)
+        return self.bindingExpressions
+    }
+
+    visitFromExpression(expression: FromExpression) {
+        this.bindingExpressions.push(expression)
+    }
+
+    visitJoinExpression(expression: JoinExpression) {
+        this.bindingExpressions.push(expression)
+    }
+}
+var collectBindings = BindingCollectorVisitor.getBindings
+
+function createIdentifiers(bindings: BindingExpression[]) {
+
+    function suggestIdentifier(bindingExpression: BindingExpression) {
+        var setExpression = bindingExpression.source
+        if (setExpression instanceof NamedSetExpression) {
+            return setExpression.name
+        } else if(setExpression instanceof QueriedSetExpression) {
+            return 'subquery'
+        } else {
+            return 'unknown'
+        }
+    }
+
+    var identifiersNeedingQualification = new Map<string, number>()
+
+    var madeIdentifiers = new Set<string>()
+
+    for (var binding of bindings) {
+        var suggestion = suggestIdentifier(binding)
+        if (madeIdentifiers.has(suggestion) && !identifiersNeedingQualification.has(suggestion)) {
+            identifiersNeedingQualification.set(suggestion, 0)
+        }
+    }
+
+    var identifiers = new Map<BindingExpression, string>()
+
+    for (var binding of bindings) {
+        var suggestion = suggestIdentifier(binding)
+        var count = identifiersNeedingQualification.get(suggestion)
+        if (typeof count === 'undefined') {
+            identifiers.set(binding, suggestion)
+        } else {
+            identifiers.set(binding, suggestion + count)
+            identifiersNeedingQualification.set(suggestion, count + 1)
+        }
+    }
+
+    return identifiers
+}
+
 class SerializerVisitor extends ExpressionVisitor {
     private stack: Run[] = []
+
+    constructor(private identifiers: Map<BindingExpression, string>) {
+        super()
+    }
 
     GetTokenTree(expression: SetExpression) {
         var result: Run | undefined
         this.run(() => {
-            this.VisitSetExpression(expression)
+            this.visitSetExpression(expression)
             if (!this.stack || this.stack.length !== 1) throw "Something's off"
             result = this.stack[0]
         })
         return result
     }
 
-    VisitSelectExpression(expression: SelectExpression) {
+    visitSelectExpression(expression: SelectExpression) {
         this.run(() => {
             this.write('SELECT')
-            this.VisitFromExpression(expression.from)
+            this.visitFromExpression(expression.from)
         })
         
         this.run(() => {
             for (var join of expression.joins) {
-                this.run(() => this.VisitJoinExpression(join))
+                this.run(() => this.visitJoinExpression(join))
             }
         })
     }
-        
-    VisitFromExpression(expression: FromExpression) {
+
+    visitFromExpression(expression: FromExpression) {
         this.run(() => {
             this.write('FROM')
-            this.VisitSetExpression(expression.source)
+            this.visitSetExpression(expression.source)
+            var identifier = this.identifiers ? this.identifiers.get(expression) : undefined
+            this.write(identifier ? identifier : '*')
         })
     }
 
-    VisitJoinExpression(expression: JoinExpression) {
+    visitJoinExpression(expression: JoinExpression) {
         this.run(() => {
             this.write(expression.kind)
-            this.VisitSetExpression(expression.source)
+            this.visitSetExpression(expression.source)
+            var identifier = this.identifiers ? this.identifiers.get(expression) : undefined
+            this.write(identifier ? identifier : '*')
         })
         this.run(() => {
             this.write('ON')
-            this.VisitPredicateExpression(expression.on)
+            this.visitPredicateExpression(expression.on)
         })
     }
 
-    VisitQueriedExpression(expression: QueriedSetExpression) {
+    visitQueriedExpression(expression: QueriedSetExpression) {
         this.write('(')
         this.run(() => {
-            this.VisitSelectExpression(expression.definition)
+            this.visitSelectExpression(expression.definition)
         })
         this.write(')')
     }
 
-    VisitNamedExpression(expression: NamedSetExpression) {
+    visitNamedExpression(expression: NamedSetExpression) {
         this.write(expression.name)
     }
 
-    VisitPredicateExpression(expression: PredicateExpression) {
+    visitPredicateExpression(expression: PredicateExpression) {
         this.write('bla')
     }
 
@@ -264,7 +337,9 @@ class SerializerVisitor extends ExpressionVisitor {
 }
 
 export function sqlify(source: SetExpression) {
-    var visitor = new SerializerVisitor()
+    var bindings = collectBindings(source)
+    var identifiers = createIdentifiers(bindings)
+    var visitor = new SerializerVisitor(identifiers)
     var tokenTree = visitor.GetTokenTree(source)
     if (!tokenTree) throw "Internal error"
     setWeights(tokenTree)

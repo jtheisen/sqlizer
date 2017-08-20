@@ -134,37 +134,41 @@ class NotExpression extends PredicateExpression {
 }
 exports.NotExpression = NotExpression;
 class ExpressionVisitor {
-    constructor() {
-        this.NotImplemented = "not implemented";
+    visitSelectExpression(expression) {
+        this.visitFromExpression(expression.from);
+        for (var join of expression.joins)
+            this.visitJoinExpression(join);
     }
-    VisitSelectExpression(expression) { throw this.NotImplemented; }
-    VisitSetExpression(expression) {
+    visitSetExpression(expression) {
         if (expression instanceof NamedSetExpression)
-            this.VisitNamedExpression(expression);
+            this.visitNamedExpression(expression);
         else if (expression instanceof QueriedSetExpression)
-            this.VisitQueriedExpression(expression);
+            this.visitQueriedExpression(expression);
         else
-            throw this.NotImplemented;
+            this.unconsidered();
     }
-    VisitQueriedExpression(expression) { throw this.NotImplemented; }
-    VisitNamedExpression(expression) { throw this.NotImplemented; }
-    VisitScalarExpression(expression) {
+    visitQueriedExpression(expression) {
+        this.visitSelectExpression(expression.definition);
+    }
+    visitNamedExpression(expression) { this.unconsidered(); }
+    visitScalarExpression(expression) {
         if (expression instanceof BindingExpression)
-            this.VisitBindingExpression(expression);
+            this.visitBindingExpression(expression);
         else
-            throw this.NotImplemented;
+            this.unconsidered();
     }
-    VisitBindingExpression(expression) {
+    visitBindingExpression(expression) {
         if (expression instanceof FromExpression)
-            this.VisitFromExpression(expression);
+            this.visitFromExpression(expression);
         else if (expression instanceof JoinExpression)
-            this.VisitJoinExpression(expression);
+            this.visitJoinExpression(expression);
         else
-            throw this.NotImplemented;
+            this.unconsidered();
     }
-    VisitFromExpression(expression) { throw this.NotImplemented; }
-    VisitJoinExpression(expression) { throw this.NotImplemented; }
-    VisitPredicateExpression(expression) { throw this.NotImplemented; }
+    visitFromExpression(expression) { this.unconsidered(); }
+    visitJoinExpression(expression) { this.unconsidered(); }
+    visitPredicateExpression(expression) { this.unconsidered(); }
+    unconsidered() { }
 }
 function setWeights(run) {
     var weight = 0;
@@ -194,59 +198,119 @@ function stringify(run) {
     strigifyImpl(run);
     return parts.join(" ");
 }
-class SerializerVisitor extends ExpressionVisitor {
+class BindingCollectorVisitor extends ExpressionVisitor {
     constructor() {
         super(...arguments);
+        this.bindingExpressions = [];
+    }
+    static getBindings(expression) {
+        var self = new BindingCollectorVisitor();
+        self.visitSetExpression(expression);
+        return self.bindingExpressions;
+    }
+    visitFromExpression(expression) {
+        console.info("here");
+        this.bindingExpressions.push(expression);
+    }
+    visitJoinExpression(expression) {
+        console.info("here");
+        this.bindingExpressions.push(expression);
+    }
+}
+var collectBindings = BindingCollectorVisitor.getBindings;
+function createIdentifiers(bindings) {
+    function suggestIdentifier(bindingExpression) {
+        var setExpression = bindingExpression.source;
+        if (setExpression instanceof NamedSetExpression) {
+            return setExpression.name;
+        }
+        else if (setExpression instanceof QueriedSetExpression) {
+            return 'subquery';
+        }
+        else {
+            return 'unknown';
+        }
+    }
+    var identifiersNeedingQualification = new Map();
+    var madeIdentifiers = new Set();
+    for (var binding of bindings) {
+        var suggestion = suggestIdentifier(binding);
+        if (madeIdentifiers.has(suggestion) && !identifiersNeedingQualification.has(suggestion)) {
+            identifiersNeedingQualification.set(suggestion, 0);
+        }
+    }
+    var identifiers = new Map();
+    for (var binding of bindings) {
+        var suggestion = suggestIdentifier(binding);
+        var count = identifiersNeedingQualification.get(suggestion);
+        if (typeof count === 'undefined') {
+            identifiers.set(binding, suggestion);
+        }
+        else {
+            identifiers.set(binding, suggestion + count);
+            identifiersNeedingQualification.set(suggestion, count + 1);
+        }
+    }
+    return identifiers;
+}
+class SerializerVisitor extends ExpressionVisitor {
+    constructor(identifiers) {
+        super();
+        this.identifiers = identifiers;
         this.stack = [];
     }
     GetTokenTree(expression) {
         var result;
         this.run(() => {
-            this.VisitSetExpression(expression);
+            this.visitSetExpression(expression);
             if (!this.stack || this.stack.length !== 1)
                 throw "Something's off";
             result = this.stack[0];
         });
         return result;
     }
-    VisitSelectExpression(expression) {
+    visitSelectExpression(expression) {
         this.run(() => {
             this.write('SELECT');
-            this.VisitFromExpression(expression.from);
+            this.visitFromExpression(expression.from);
         });
         this.run(() => {
             for (var join of expression.joins) {
-                this.run(() => this.VisitJoinExpression(join));
+                this.run(() => this.visitJoinExpression(join));
             }
         });
     }
-    VisitFromExpression(expression) {
+    visitFromExpression(expression) {
         this.run(() => {
             this.write('FROM');
-            this.VisitSetExpression(expression.source);
+            this.visitSetExpression(expression.source);
+            var identifier = this.identifiers ? this.identifiers.get(expression) : undefined;
+            this.write(identifier ? identifier : '*');
         });
     }
-    VisitJoinExpression(expression) {
+    visitJoinExpression(expression) {
         this.run(() => {
             this.write(expression.kind);
-            this.VisitSetExpression(expression.source);
+            this.visitSetExpression(expression.source);
+            var identifier = this.identifiers ? this.identifiers.get(expression) : undefined;
+            this.write(identifier ? identifier : '*');
         });
         this.run(() => {
             this.write('ON');
-            this.VisitPredicateExpression(expression.on);
+            this.visitPredicateExpression(expression.on);
         });
     }
-    VisitQueriedExpression(expression) {
+    visitQueriedExpression(expression) {
         this.write('(');
         this.run(() => {
-            this.VisitSelectExpression(expression.definition);
+            this.visitSelectExpression(expression.definition);
         });
         this.write(')');
     }
-    VisitNamedExpression(expression) {
+    visitNamedExpression(expression) {
         this.write(expression.name);
     }
-    VisitPredicateExpression(expression) {
+    visitPredicateExpression(expression) {
         this.write('bla');
     }
     run(nested) {
@@ -273,7 +337,9 @@ class SerializerVisitor extends ExpressionVisitor {
     }
 }
 function sqlify(source) {
-    var visitor = new SerializerVisitor();
+    var bindings = collectBindings(source);
+    var identifiers = createIdentifiers(bindings);
+    var visitor = new SerializerVisitor(identifiers);
     var tokenTree = visitor.GetTokenTree(source);
     if (!tokenTree)
         throw "Internal error";
