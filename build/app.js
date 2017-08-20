@@ -18,5 +18,5 @@ var myQuery = fluent_1.query(() => {
     var p = { e: x, c: y };
     return p;
 });
-expression_1.sqlify(myQuery.expression);
+console.info(expression_1.sqlify(myQuery.expression));
 //# sourceMappingURL=app.js.map

@@ -47,7 +47,7 @@ var myQuery = query(() =>
     return p;
 })
 
-sqlify(myQuery.expression)
+console.info(sqlify(myQuery.expression))
 
 // tape('', t => {
 // }
