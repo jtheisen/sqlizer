@@ -144,12 +144,36 @@ class ExpressionVisitor {
     private NotImplemented = "not implemented"
 }
 
-class PrintVisitor extends ExpressionVisitor {
-    VisitSelectExpression(expression: SelectExpression) {
-        this.write('SELECT')
-        this.VisitFromExpression(expression.from)
-        for (var join of expression.joins)
-            this.VisitJoinExpression(join)
+interface Wrap {
+    lead: string[]
+    run: Run | null
+    trail: string[]
+}
+
+interface Run {
+    wraps: Wrap[]
+}
+
+interface Frame {
+    run: Run
+    wrap: Wrap | null // this wrap is in the former run
+    tokens: string[] | null // these tokens are in the former wrap
+}
+
+class SerializerVisitor extends ExpressionVisitor {
+    private stack: Frame[] = []
+
+   VisitSelectExpression(expression: SelectExpression) {
+        this.wrap(() => {
+            this.write('SELECT')
+            this.VisitFromExpression(expression.from)
+        
+            this.run(() => {
+                for (var join of expression.joins) {
+                    this.wrap(() => this.VisitJoinExpression(join))
+                }
+            })
+        })
     }
 
     VisitFromExpression(expression: FromExpression) {
@@ -178,8 +202,58 @@ class PrintVisitor extends ExpressionVisitor {
         this.write('bla')
     }
 
+    run(nested: () => void) {
+        var topFrame = this.stack[this.stack.length - 1]
+
+        if (topFrame.run) throw "Cant open run while at a trail"
+
+        this.stack.push({
+            run: { wraps: [] },
+            wrap: null,
+            tokens: null
+        })
+        try {
+            nested()
+        }
+        finally {
+            var frame = this.stack.pop()
+            if (!frame) throw "Unexpected end of stack"
+            if (this.stack[this.stack.length - 1] !== topFrame) throw "Unexpected top frame"
+            if (!topFrame.wrap) throw "Frame returned to from a run had no open wrap."
+            topFrame.wrap.run = frame.run
+            topFrame.tokens = topFrame.wrap.trail
+        }
+    }
+
+    wrap(nested: () => void) {
+        var topFrame = this.stack[this.stack.length - 1]
+
+        if (topFrame.wrap) throw "Cannot open wrap within a wrap"
+            
+        var newWrap = {
+            lead: [],
+            run: null,
+            trail: []
+        }
+        topFrame.run.wraps.push(newWrap)
+        topFrame.wrap = newWrap
+        topFrame.tokens = newWrap.lead
+        
+        try {
+            nested()
+        }
+        finally {
+            if (this.stack[this.stack.length - 1] !== topFrame) throw "Unexpected top frame"
+
+            topFrame.wrap = null
+            topFrame.tokens = null
+        }
+    }
+
     write(text: string) {
-        console.info(text)
+        var topFrame = this.stack[this.stack.length - 1]
+        if (!topFrame || !topFrame.tokens) throw "Token has nothing opened to go to"
+        topFrame.tokens.push(text)
     }
 }
 
