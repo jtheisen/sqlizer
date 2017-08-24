@@ -4,12 +4,16 @@
   "description": "",
   "main": "dist/app.bundle.js",
   "scripts": {
-    "build": "tsc && webpack",
+    "build": "webpack",
     "test": "node dist/app.bundle.js"
   },
   "author": "",
   "license": "ISC",
-  "devDependencies": {},
+  "devDependencies": {
+    "awesome-typescript-loader": "^3.2.3",
+    "source-map-loader": "^0.2.1",
+    "typescript": "^2.4.2"
+  },
   "dependencies": {
     "@types/tape": "^4.2.30",
     "tape": "^4.8.0",

@@ -52,11 +52,6 @@ export class OrderByExpression {
 export class ScalarExpression {
 }
 
-export class IsNullOrNotExpression {
-
-    operand: ScalarExpression
-}
-
 // a single value expressed by a subquery
 export class ScalarSubqueryExpression extends ScalarExpression {
     // the subquery must have only one item in its select list
@@ -90,17 +85,51 @@ export class PredicateExpression {
 }
 
 export class ComparisonExpression extends PredicateExpression {
-    operator: string
+    constructor(
 
-    lhs: ScalarExpression
-    rhs: ScalarExpression
+        public operator: string,
+
+        public lhs: ScalarExpression,
+        public rhs: ScalarExpression
+        
+    ) { super() }
+}
+
+export class IsNullOrNotExpression extends PredicateExpression {
+    constructor(
+
+        public operand: ScalarExpression,
+        public isNull: boolean = true
+
+    ) { super() }
+}
+
+export class IsInExpression extends PredicateExpression {
+    constructor(
+
+        public lhs: ScalarExpression,
+        public rhs: SetExpression
+
+    ) { super() }
+}
+
+export class ExistsExpression extends PredicateExpression {
+    constructor(
+
+        public operand: SetExpression
+
+    ) { super() }
 }
 
 export class LogicalBinaryExpression extends PredicateExpression {
-    operator: string
+    constructor(
 
-    lhs: PredicateExpression
-    rhs: PredicateExpression
+        public operator: string,
+        
+        public lhs: PredicateExpression,
+        public rhs: PredicateExpression
+        
+    ) { super() }
 }
 
 export class NotExpression extends PredicateExpression {
@@ -125,7 +154,7 @@ class ExpressionVisitor {
     visitQueriedExpression(expression: QueriedSetExpression) {
         this.visitSelectExpression(expression.definition)
     }
-    visitNamedExpression(expression: NamedSetExpression) { this.unconsidered() }
+    visitNamedExpression(expression: NamedSetExpression) { }
     //visitImmediateExpression(expression: ImmediateSetExpression) { this.unconsidered() }
 
     visitScalarExpression(expression: ScalarExpression) {
@@ -142,10 +171,51 @@ class ExpressionVisitor {
         else
             this.unconsidered()
     }
-    visitFromExpression(expression: FromExpression) { this.unconsidered() }
-    visitJoinExpression(expression: JoinExpression) { this.unconsidered() }
+    visitFromExpression(expression: FromExpression) {
+        this.visitSetExpression(expression.source)
+    }
+    visitJoinExpression(expression: JoinExpression) {
+        this.visitSetExpression(expression.source)
+        this.visitPredicateExpression(expression.on)
+    }
 
-    visitPredicateExpression(expression: PredicateExpression) { this.unconsidered() }
+    visitPredicateExpression(expression: PredicateExpression) {
+        if (expression instanceof ComparisonExpression)
+            this.visitComparisonExpression(expression)
+        else if (expression instanceof LogicalBinaryExpression)
+            this.visitLogicalBinaryExpression(expression)
+        else if (expression instanceof NotExpression)
+            this.visitNotExpression(expression)
+        else if (expression instanceof IsNullOrNotExpression)
+            this.visitIsNullOrNotExpression(expression)
+        else if (expression instanceof IsInExpression)
+            this.visitIsInExpression(expression)
+        else if (expression instanceof ExistsExpression)
+            this.visitExistsExpression(expression)
+        else
+            this.unconsidered()
+    }
+    visitComparisonExpression(expression: ComparisonExpression) {
+        this.visitScalarExpression(expression.lhs)
+        this.visitScalarExpression(expression.rhs)
+    }
+    visitLogicalBinaryExpression(expression: LogicalBinaryExpression) {
+        this.visitPredicateExpression(expression.lhs)
+        this.visitPredicateExpression(expression.rhs)
+    }
+    visitNotExpression(expression: NotExpression) {
+        this.visitPredicateExpression(expression.operand)
+    }
+    visitIsNullOrNotExpression(expression: IsNullOrNotExpression) {
+        this.visitScalarExpression(expression.operand)
+    }
+    visitIsInExpression(expression: IsInExpression) {
+        this.visitScalarExpression(expression.lhs)
+        this.visitSetExpression(expression.rhs)
+    }
+    visitExistsExpression(expression: ExistsExpression) {
+        this.visitSetExpression(expression.operand)
+    }
 
     unconsidered() { }
 }
@@ -307,8 +377,30 @@ class SerializerVisitor extends ExpressionVisitor {
         this.write(expression.name)
     }
 
-    visitPredicateExpression(expression: PredicateExpression) {
-        this.write('bla')
+    visitComparisonExpression(expression: ComparisonExpression) {
+        this.visitScalarExpression(expression.lhs)
+        this.write(expression.operator)
+        this.visitScalarExpression(expression.rhs)
+    }
+    visitLogicalBinaryExpression(expression: LogicalBinaryExpression) {
+        this.visitPredicateExpression(expression.lhs)
+        this.write(expression.operator)
+        this.visitPredicateExpression(expression.rhs)
+    }
+    visitNotExpression(expression: NotExpression) {
+        this.write('NOT')
+        this.visitPredicateExpression(expression.operand)
+    }
+    visitIsNullOrNotExpression(expression: IsNullOrNotExpression) {
+        this.visitScalarExpression(expression.operand)
+        this.write(expression.isNull ? 'IS NULL' : 'IS NOT NULL')
+    }
+    visitIsInExpression(expression: IsInExpression) {
+        this.visitScalarExpression(expression.lhs)
+        this.visitSetExpression(expression.rhs)
+    }
+    visitExistsExpression(expression: ExistsExpression) {
+        this.visitSetExpression(expression.operand)
     }
 
     run(nested: () => void) {

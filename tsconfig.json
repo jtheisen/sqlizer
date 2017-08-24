@@ -11,13 +11,13 @@
             "es6"
         ],
         "pretty": true,
-        "outDir": "build",
-        "sourceMap": true,
         "rootDir": "src",
         "typeRoots": [
             "node_modules/@types",
             "typings"
-        ]
+        ],
+        "sourceMap": true
+        //"sourceRoot": "../src"
     },
     "include": [
         "src/**/*"

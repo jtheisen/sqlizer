@@ -97,9 +97,6 @@ exports.OrderByExpression = OrderByExpression;
 class ScalarExpression {
 }
 exports.ScalarExpression = ScalarExpression;
-class IsNullOrNotExpression {
-}
-exports.IsNullOrNotExpression = IsNullOrNotExpression;
 class ScalarSubqueryExpression extends ScalarExpression {
 }
 exports.ScalarSubqueryExpression = ScalarSubqueryExpression;
@@ -125,9 +122,44 @@ class PredicateExpression {
 }
 exports.PredicateExpression = PredicateExpression;
 class ComparisonExpression extends PredicateExpression {
+    constructor(operator, lhs, rhs) {
+        super();
+        this.operator = operator;
+        this.lhs = lhs;
+        this.rhs = rhs;
+    }
 }
 exports.ComparisonExpression = ComparisonExpression;
+class IsNullOrNotExpression extends PredicateExpression {
+    constructor(operand, isNull = true) {
+        super();
+        this.operand = operand;
+        this.isNull = isNull;
+    }
+}
+exports.IsNullOrNotExpression = IsNullOrNotExpression;
+class IsInExpression extends PredicateExpression {
+    constructor(lhs, rhs) {
+        super();
+        this.lhs = lhs;
+        this.rhs = rhs;
+    }
+}
+exports.IsInExpression = IsInExpression;
+class ExistsExpression extends PredicateExpression {
+    constructor(operand) {
+        super();
+        this.operand = operand;
+    }
+}
+exports.ExistsExpression = ExistsExpression;
 class LogicalBinaryExpression extends PredicateExpression {
+    constructor(operator, lhs, rhs) {
+        super();
+        this.operator = operator;
+        this.lhs = lhs;
+        this.rhs = rhs;
+    }
 }
 exports.LogicalBinaryExpression = LogicalBinaryExpression;
 class NotExpression extends PredicateExpression {
@@ -150,7 +182,7 @@ class ExpressionVisitor {
     visitQueriedExpression(expression) {
         this.visitSelectExpression(expression.definition);
     }
-    visitNamedExpression(expression) { this.unconsidered(); }
+    visitNamedExpression(expression) { }
     visitScalarExpression(expression) {
         if (expression instanceof BindingExpression)
             this.visitBindingExpression(expression);
@@ -165,9 +197,50 @@ class ExpressionVisitor {
         else
             this.unconsidered();
     }
-    visitFromExpression(expression) { this.unconsidered(); }
-    visitJoinExpression(expression) { this.unconsidered(); }
-    visitPredicateExpression(expression) { this.unconsidered(); }
+    visitFromExpression(expression) {
+        this.visitSetExpression(expression.source);
+    }
+    visitJoinExpression(expression) {
+        this.visitSetExpression(expression.source);
+        this.visitPredicateExpression(expression.on);
+    }
+    visitPredicateExpression(expression) {
+        if (expression instanceof ComparisonExpression)
+            this.visitComparisonExpression(expression);
+        else if (expression instanceof LogicalBinaryExpression)
+            this.visitLogicalBinaryExpression(expression);
+        else if (expression instanceof NotExpression)
+            this.visitNotExpression(expression);
+        else if (expression instanceof IsNullOrNotExpression)
+            this.visitIsNullOrNotExpression(expression);
+        else if (expression instanceof IsInExpression)
+            this.visitIsInExpression(expression);
+        else if (expression instanceof ExistsExpression)
+            this.visitExistsExpression(expression);
+        else
+            this.unconsidered();
+    }
+    visitComparisonExpression(expression) {
+        this.visitScalarExpression(expression.lhs);
+        this.visitScalarExpression(expression.rhs);
+    }
+    visitLogicalBinaryExpression(expression) {
+        this.visitPredicateExpression(expression.lhs);
+        this.visitPredicateExpression(expression.rhs);
+    }
+    visitNotExpression(expression) {
+        this.visitPredicateExpression(expression.operand);
+    }
+    visitIsNullOrNotExpression(expression) {
+        this.visitScalarExpression(expression.operand);
+    }
+    visitIsInExpression(expression) {
+        this.visitScalarExpression(expression.lhs);
+        this.visitSetExpression(expression.rhs);
+    }
+    visitExistsExpression(expression) {
+        this.visitSetExpression(expression.operand);
+    }
     unconsidered() { }
 }
 function setWeights(run) {
@@ -209,11 +282,9 @@ class BindingCollectorVisitor extends ExpressionVisitor {
         return self.bindingExpressions;
     }
     visitFromExpression(expression) {
-        console.info("here");
         this.bindingExpressions.push(expression);
     }
     visitJoinExpression(expression) {
-        console.info("here");
         this.bindingExpressions.push(expression);
     }
 }
@@ -310,8 +381,30 @@ class SerializerVisitor extends ExpressionVisitor {
     visitNamedExpression(expression) {
         this.write(expression.name);
     }
-    visitPredicateExpression(expression) {
-        this.write('bla');
+    visitComparisonExpression(expression) {
+        this.visitScalarExpression(expression.lhs);
+        this.write(expression.operator);
+        this.visitScalarExpression(expression.rhs);
+    }
+    visitLogicalBinaryExpression(expression) {
+        this.visitPredicateExpression(expression.lhs);
+        this.write(expression.operator);
+        this.visitPredicateExpression(expression.rhs);
+    }
+    visitNotExpression(expression) {
+        this.write('NOT');
+        this.visitPredicateExpression(expression.operand);
+    }
+    visitIsNullOrNotExpression(expression) {
+        this.visitScalarExpression(expression.operand);
+        this.write(expression.isNull ? 'IS NULL' : 'IS NOT NULL');
+    }
+    visitIsInExpression(expression) {
+        this.visitScalarExpression(expression.lhs);
+        this.visitSetExpression(expression.rhs);
+    }
+    visitExistsExpression(expression) {
+        this.visitSetExpression(expression.operand);
     }
     run(nested) {
         var previousRun = this.stack[this.stack.length - 1];
@@ -347,7 +440,7 @@ function sqlify(source) {
     return stringify(tokenTree);
 }
 exports.sqlify = sqlify;
-//# sourceMappingURL=expression.js.map
+
 
 /***/ }),
 /* 1 */
@@ -382,7 +475,7 @@ var myQuery = fluent_1.query(() => {
     return p;
 });
 console.info(expression_1.sqlify(myQuery.expression));
-//# sourceMappingURL=app.js.map
+
 
 /***/ }),
 /* 3 */
@@ -393,21 +486,30 @@ console.info(expression_1.sqlify(myQuery.expression));
 Object.defineProperty(exports, "__esModule", { value: true });
 const expression_1 = __webpack_require__(0);
 class ConcreteScalar {
-    constructor(set) {
-        this.set = set;
+    constructor(expression) {
+        this.expression = expression;
     }
-    add(rhs) { throw 0; }
-    eq(rhs) { throw 0; }
+    eq(rhs) { return new Predicate(new expression_1.ComparisonExpression('=', this.expression, rhs.expression)); }
+    ne(rhs) { return new Predicate(new expression_1.ComparisonExpression('<>', this.expression, rhs.expression)); }
+    lt(rhs) { return new Predicate(new expression_1.ComparisonExpression('<', this.expression, rhs.expression)); }
+    gt(rhs) { return new Predicate(new expression_1.ComparisonExpression('>', this.expression, rhs.expression)); }
+    le(rhs) { return new Predicate(new expression_1.ComparisonExpression('<=', this.expression, rhs.expression)); }
+    ge(rhs) { return new Predicate(new expression_1.ComparisonExpression('>=', this.expression, rhs.expression)); }
+    isIn(rhs) { return new Predicate(new expression_1.IsInExpression(this.expression, rhs.expression)); }
 }
 class Predicate {
-    and(rhs) { throw 0; }
-    or(rhs) { throw 0; }
+    constructor(expression) {
+        this.expression = expression;
+    }
+    and(rhs) { return new Predicate(new expression_1.LogicalBinaryExpression('AND', this.expression, rhs.expression)); }
+    or(rhs) { throw new Predicate(new expression_1.LogicalBinaryExpression('OR', this.expression, rhs.expression)); }
 }
 var SqlTrue;
 class SqlSet {
     constructor(expression) {
         this.expression = expression;
     }
+    any() { return new Predicate(new expression_1.ExistsExpression(this.expression)); }
 }
 exports.SqlSet = SqlSet;
 function defineTable(name) {
@@ -458,7 +560,8 @@ exports.query = (monad) => {
 function getSetExpression(source) {
     return source.expression;
 }
-//# sourceMappingURL=fluent.js.map
+
 
 /***/ })
 /******/ ]);
+//# sourceMappingURL=app.bundle.js.map

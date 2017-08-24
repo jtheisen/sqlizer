@@ -1,7 +1,13 @@
 import {
+    BindingExpression,
+    ComparisonExpression,
+    ExistsExpression,
     FromExpression,
+    IsInExpression,
     JoinExpression,
+    LogicalBinaryExpression,
     NamedSetExpression,
+    PredicateExpression,
     QueriedSetExpression,
     ScalarExpression,
     SelectExpression,
@@ -11,21 +17,18 @@ import {
 
 
 class ConcreteScalar<T> {
-    constructor(public set: SetExpression) {
-
-    }
+    constructor(public expression: ScalarExpression) { }
 
     value: T;
   
-    add(rhs: Scalar<T>): Scalar<T> { throw 0 }
-    eq(rhs: Scalar<T>): Predicate { throw 0 }
-    // ne(rhs: Scalar<T>): Predicate;
-    // lt(rhs: Scalar<T>): Predicate;
-    // gt(rhs: Scalar<T>): Predicate;
-    // le(rhs: Scalar<T>): Predicate;
-    // ge(rhs: Scalar<T>): Predicate;
+    eq(rhs: Scalar<T>): Predicate { return new Predicate(new ComparisonExpression('=', this.expression, rhs.expression)) }
+    ne(rhs: Scalar<T>): Predicate { return new Predicate(new ComparisonExpression('<>', this.expression, rhs.expression)) }
+    lt(rhs: Scalar<T>): Predicate { return new Predicate(new ComparisonExpression('<', this.expression, rhs.expression)) }
+    gt(rhs: Scalar<T>): Predicate { return new Predicate(new ComparisonExpression('>', this.expression, rhs.expression)) }
+    le(rhs: Scalar<T>): Predicate { return new Predicate(new ComparisonExpression('<=', this.expression, rhs.expression)) }
+    ge(rhs: Scalar<T>): Predicate { return new Predicate(new ComparisonExpression('>=', this.expression, rhs.expression)) }
 
-    // in(rhs: SqlSet<T> | T[]): Predicate;    
+    isIn(rhs: SqlSet<T>): Predicate { return new Predicate(new IsInExpression(this.expression, rhs.expression)) }
 }
 
 // The point being that this prohibits unwittingly calling inappropriate functions in query expressions.
@@ -39,16 +42,20 @@ export type Scalar1<T> = { [P in keyof T]: Scalar2<T[P]> } & ConcreteScalar<T>
 export type Scalar<T> = { [P in keyof T]: Scalar1<T[P]> } & ConcreteScalar<T>
 
 class Predicate {
-    and(rhs: Predicate): Predicate { throw 0 }
-    or(rhs: Predicate): Predicate { throw 0 }
+
+    constructor(public expression: PredicateExpression) { }
+
+    and(rhs: Predicate): Predicate { return new Predicate(new LogicalBinaryExpression('AND', this.expression, rhs.expression)) }
+    or(rhs: Predicate): Predicate { throw new Predicate(new LogicalBinaryExpression('OR', this.expression, rhs.expression)) }
+
 }
 
 var SqlTrue: Predicate;
 
-
 export class SqlSet<E> {
-    constructor(public expression: SetExpression) {
-    }
+    constructor(public expression: SetExpression) { }
+
+    any(): Predicate { return new Predicate(new ExistsExpression(this.expression)) }
 }
 
 export function defineTable<E>(name: string): SqlSet<E> {
