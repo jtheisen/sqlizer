@@ -118,6 +118,9 @@ exports.FromExpression = FromExpression;
 class JoinExpression extends BindingExpression {
 }
 exports.JoinExpression = JoinExpression;
+class MemberExpression extends ScalarExpression {
+}
+exports.MemberExpression = MemberExpression;
 class PredicateExpression {
 }
 exports.PredicateExpression = PredicateExpression;
@@ -205,6 +208,7 @@ class ExpressionVisitor {
         this.visitPredicateExpression(expression.on);
     }
     visitPredicateExpression(expression) {
+        console.info("here: " + expression);
         if (expression instanceof ComparisonExpression)
             this.visitComparisonExpression(expression);
         else if (expression instanceof LogicalBinaryExpression)
@@ -470,7 +474,7 @@ var myCities = fluent_1.defineTable("myCities");
 var myEntity = new Entity();
 var myQuery = fluent_1.query(() => {
     var x = fluent_1.from(myEntities);
-    var y = fluent_1.join(myCities).on(c => x.city.name.eq(c.name));
+    var y = fluent_1.join(myCities).on(c => x.name.eq(c.name));
     var p = { e: x, c: y };
     return p;
 });
@@ -486,8 +490,14 @@ console.info(expression_1.sqlify(myQuery.expression));
 Object.defineProperty(exports, "__esModule", { value: true });
 const expression_1 = __webpack_require__(0);
 class ConcreteScalar {
-    constructor(expression) {
+    constructor(expression, value) {
         this.expression = expression;
+        this.value = value;
+        for (var key in value) {
+            if (key in this)
+                continue;
+            this[key] = value[key];
+        }
     }
     eq(rhs) { return new Predicate(new expression_1.ComparisonExpression('=', this.expression, rhs.expression)); }
     ne(rhs) { return new Predicate(new expression_1.ComparisonExpression('<>', this.expression, rhs.expression)); }
@@ -506,16 +516,17 @@ class Predicate {
 }
 var SqlTrue;
 class SqlSet {
-    constructor(expression) {
+    constructor(expression, schema) {
         this.expression = expression;
+        this.schema = schema;
     }
     any() { return new Predicate(new expression_1.ExistsExpression(this.expression)); }
 }
 exports.SqlSet = SqlSet;
-function defineTable(name) {
+function defineTable(name, schema) {
     var expression = new expression_1.NamedSetExpression();
     expression.name = name;
-    return new SqlSet(expression);
+    return new SqlSet(expression, schema);
 }
 exports.defineTable = defineTable;
 function immediate(value) { throw null; }
@@ -523,8 +534,8 @@ var scalar = (e) => e;
 function from(source) {
     var evaluation = getCurrentEvaluation();
     evaluation.expression.from = new expression_1.FromExpression();
-    evaluation.expression.from.source = getSetExpression(source);
-    return new ConcreteScalar(evaluation.expression.from.source);
+    evaluation.expression.from.source = source.expression;
+    return new ConcreteScalar(evaluation.expression.from.source, source.schema);
 }
 exports.from = from;
 function join(source) {
@@ -532,10 +543,12 @@ function join(source) {
         on: (condition) => {
             var evaluation = getCurrentEvaluation();
             var joinExpression = new expression_1.JoinExpression();
-            joinExpression.source = getSetExpression(source);
+            joinExpression.source = source.expression;
             joinExpression.kind = 'join';
+            var scalar = new ConcreteScalar(joinExpression.source, source.schema);
+            joinExpression.on = condition(scalar).expression;
             evaluation.expression.joins.push(joinExpression);
-            return new ConcreteScalar(joinExpression.source);
+            return scalar;
         }
     };
 }
@@ -551,7 +564,7 @@ exports.query = (monad) => {
         var evaluation = getCurrentEvaluation();
         var setExpression = new expression_1.QueriedSetExpression();
         setExpression.definition = evaluation.expression;
-        return new SqlSet(setExpression);
+        return new SqlSet(setExpression, result);
     }
     finally {
         evaluationStack.pop();
@@ -564,4 +577,3 @@ function getSetExpression(source) {
 
 /***/ })
 /******/ ]);
-//# sourceMappingURL=app.bundle.js.map

@@ -81,6 +81,11 @@ export class JoinExpression extends BindingExpression {
     on: PredicateExpression
 }
 
+export class MemberExpression extends ScalarExpression {
+    parent: ScalarExpression
+    member: string
+}
+
 export class PredicateExpression {
 }
 
@@ -180,6 +185,8 @@ class ExpressionVisitor {
     }
 
     visitPredicateExpression(expression: PredicateExpression) {
+        console.info("here: " + expression)
+        
         if (expression instanceof ComparisonExpression)
             this.visitComparisonExpression(expression)
         else if (expression instanceof LogicalBinaryExpression)
@@ -377,7 +384,7 @@ class SerializerVisitor extends ExpressionVisitor {
         this.write(expression.name)
     }
 
-    visitComparisonExpression(expression: ComparisonExpression) {
+    visitComparisonExpression(expression: ComparisonExpression) {        
         this.visitScalarExpression(expression.lhs)
         this.write(expression.operator)
         this.visitScalarExpression(expression.rhs)

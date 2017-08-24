@@ -3,7 +3,7 @@ const webpack = require('webpack');
 
 module.exports = {
   entry: [ './src/app.ts' ],
-  devtool: 'source-map',
+  //devtool: 'source-map',
   resolve: {
     extensions: [".ts", ".tsx", ".js", ".json"]
   },

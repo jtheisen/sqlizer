@@ -1,5 +1,5 @@
 import { sqlify } from './expression';
-import { defineTable, from, join, query, SqlSet } from './fluent';
+import { asSet, defineTable, from, join, query, Scalar, SqlSet } from './fluent';
 import * as tape from 'tape';
 
 /*
@@ -29,10 +29,11 @@ class Entity {
 
 class City {
     name: string
+    entities: Entity[]
 }
 
-var myEntities: SqlSet<Entity> = defineTable("myEntities");
-var myCities: SqlSet<City> = defineTable("myCities");
+var myEntities: SqlSet<Entity> = defineTable("myEntities", new Entity());
+var myCities: SqlSet<City> = defineTable("myCities", new City());
 
 var myEntity = new Entity();
 
@@ -40,11 +41,12 @@ var myEntity = new Entity();
 var myQuery = query(() =>
 {
     var x = from(myEntities);
-    var y = join(myCities).on(c => x.city.name.eq(c.name));
+    var y = join(myCities).on(c => x.name.eq(c.name).and(x.isIn(y.entities)));
+    var z = join(y.entities);
 
-    var p = { e: x, c: y }
+    // var p = { e: x, c: y }
 
-    return p;
+    return {};
 })
 
 console.info(sqlify(myQuery.expression))

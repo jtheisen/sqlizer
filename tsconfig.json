@@ -15,8 +15,8 @@
         "typeRoots": [
             "node_modules/@types",
             "typings"
-        ],
-        "sourceMap": true
+        ]
+        //"sourceMap": true
         //"sourceRoot": "../src"
     },
     "include": [
