@@ -13,7 +13,7 @@
                 "${workspaceRoot}/dist/**/*.js"
             ],
             "sourceMaps": true,
-            "trace": true
+            "trace": false
         }
     ]
 }

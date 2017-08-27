@@ -1,3 +1,5 @@
+import { createProxy, getTrivialProxySchema, ProxySchema } from './proxy';
+import { EntityDescriptor } from './entities';
 import {
     BindingExpression,
     ComparisonExpression,
@@ -15,22 +17,32 @@ import {
     SetExpression,
 } from './expression';
 
+// case 1: creating a scalar from a javascript object, eg. through a map
+//   scan the object and create a proxy that returns proxied objects from its getters for all props
+// case 2: creating a scalar from a from or join expression
+//
 
 
-class ConcreteScalar<T> {
-    constructor(public expression: ScalarExpression, public value: T) {
-        var schema: any = {}
-        for (var key in value) {
-            var expr = new MemberExpression()
-            expr.parent = expression
-            expr.member = key
-            var nested = new ConcreteScalar(expr, value[key])
-            schema[key] = nested
-            if (key in this) continue
-            (this as any)[key] = nested
+function getProxySchemaForObject(target: any) {
+    return {
+        properties: Object.keys(target),
+        proxyPrototype: ConcreteScalar.prototype,
+        getPropertySchema(name: string) {
+            return getProxySchemaForObject(target[name])
         }
     }
-  
+}
+
+function createScalar<T>(expression: ScalarExpression, target: any): Scalar<T> {
+    var scalar = createProxy(getProxySchemaForObject(target))
+    scalar.expression = expression
+    return scalar
+}
+
+
+export class ConcreteScalar<T> {
+    expression: ScalarExpression
+
     eq(rhs: Scalar<T>): Predicate { return new Predicate(new ComparisonExpression('=', this.expression, rhs.expression)) }
     ne(rhs: Scalar<T>): Predicate { return new Predicate(new ComparisonExpression('<>', this.expression, rhs.expression)) }
     lt(rhs: Scalar<T>): Predicate { return new Predicate(new ComparisonExpression('<', this.expression, rhs.expression)) }
@@ -90,7 +102,8 @@ export function from<S>(source: SqlSet<S>): Scalar<S> {
     var evaluation = getCurrentEvaluation();
     evaluation.expression.from = new FromExpression()
     evaluation.expression.from.source = source.expression
-    return new ConcreteScalar<S>(evaluation.expression.from.source, source.schema) as any as Scalar<S>;
+    var scalar = createScalar<S>(evaluation.expression.from, source.schema)
+    return scalar
 }
 
 export function join<S>(source: SqlSet<S>): { on: (condition: (s: Scalar<S>) => Predicate) => Scalar<S> } {
@@ -103,7 +116,7 @@ export function join<S>(source: SqlSet<S>): { on: (condition: (s: Scalar<S>) => 
             var joinExpression = new JoinExpression()
             joinExpression.source = source.expression
             joinExpression.kind = 'join'
-            var scalar = new ConcreteScalar<S>(joinExpression.source, source.schema) as any as Scalar<S>
+            var scalar = createScalar<S>(joinExpression, source.schema)
             joinExpression.on = condition(scalar).expression
         
             evaluation.expression.joins.push(joinExpression)

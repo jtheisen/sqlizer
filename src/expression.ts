@@ -82,8 +82,10 @@ export class JoinExpression extends BindingExpression {
 }
 
 export class MemberExpression extends ScalarExpression {
-    parent: ScalarExpression
-    member: string
+    constructor(
+        public parent: ScalarExpression,
+        public member: string
+    ) { super() }
 }
 
 export class PredicateExpression {

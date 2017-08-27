@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@types/tape": "^4.2.30",
+    "reflect-metadata": "^0.1.10",
     "tape": "^4.8.0",
     "webpack": "^3.5.5"
   }

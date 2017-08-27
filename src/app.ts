@@ -1,6 +1,10 @@
-import { sqlify } from './expression';
+import { MemberExpression, ScalarExpression, sqlify } from './expression';
 import { asSet, defineTable, from, join, query, Scalar, SqlSet } from './fluent';
+import { Table, defString } from './entities'
 import * as tape from 'tape';
+import 'reflect-metadata';
+
+ 
 
 /*
 
@@ -19,37 +23,39 @@ It does not yet, however, contain the following:
 
 */
 
+//var x: PropertyDescriptor
 
 
-class Entity {
-    name: string
-    age = 32
-    city: City
-}
-
+@Table
 class City {
-    name: string
-    entities: Entity[]
+    name = defString()
 }
 
-var myEntities: SqlSet<Entity> = defineTable("myEntities", new Entity());
-var myCities: SqlSet<City> = defineTable("myCities", new City());
+@Table
+class Entity {
+    name?: string
+    age = 32
+}
 
-var myEntity = new Entity();
+// var myEntities: SqlSet<Entity> = defineTable("myEntities", new Entity());
+// var myCities: SqlSet<City> = defineTable("myCities", new City());
+
+// var myEntity = new Entity();
 
 
-var myQuery = query(() =>
-{
-    var x = from(myEntities);
-    var y = join(myCities).on(c => x.name.eq(c.name).and(x.isIn(y.entities)));
-    var z = join(y.entities);
 
-    // var p = { e: x, c: y }
+// var myQuery = query(() =>
+// {
+//     var x = from(myEntities);
+//     var y = join(myCities).on(c => x.name.eq(c.name).and(x.isIn(y.entities)));
+//     var z = join(y.entities);
 
-    return {};
-})
+//     // var p = { e: x, c: y }
 
-console.info(sqlify(myQuery.expression))
+//     return {};
+// })
+
+//console.info(sqlify(myQuery.expression))
 
 // tape('', t => {
 // }
