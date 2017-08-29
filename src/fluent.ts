@@ -26,7 +26,7 @@ import {
 function getProxySchemaForObject(target: any) {
     return {
         properties: Object.keys(target),
-        proxyPrototype: ConcreteScalar.prototype,
+        proxyPrototype: ColumnScalar.prototype,
         getPropertySchema(name: string) {
             return getProxySchemaForObject(target[name])
         }
@@ -40,28 +40,21 @@ function createScalar<T>(expression: ScalarExpression, target: any): Scalar<T> {
 }
 
 
-export class ConcreteScalar<T> {
+export class ColumnScalar<T> {
     expression: ScalarExpression
 
-    eq(rhs: Scalar<T>): Predicate { return new Predicate(new ComparisonExpression('=', this.expression, rhs.expression)) }
-    ne(rhs: Scalar<T>): Predicate { return new Predicate(new ComparisonExpression('<>', this.expression, rhs.expression)) }
-    lt(rhs: Scalar<T>): Predicate { return new Predicate(new ComparisonExpression('<', this.expression, rhs.expression)) }
-    gt(rhs: Scalar<T>): Predicate { return new Predicate(new ComparisonExpression('>', this.expression, rhs.expression)) }
-    le(rhs: Scalar<T>): Predicate { return new Predicate(new ComparisonExpression('<=', this.expression, rhs.expression)) }
-    ge(rhs: Scalar<T>): Predicate { return new Predicate(new ComparisonExpression('>=', this.expression, rhs.expression)) }
+    eq(rhs: ColumnScalar<T>): Predicate { return new Predicate(new ComparisonExpression('=', this.expression, rhs.expression)) }
+    ne(rhs: ColumnScalar<T>): Predicate { return new Predicate(new ComparisonExpression('<>', this.expression, rhs.expression)) }
+    lt(rhs: ColumnScalar<T>): Predicate { return new Predicate(new ComparisonExpression('<', this.expression, rhs.expression)) }
+    gt(rhs: ColumnScalar<T>): Predicate { return new Predicate(new ComparisonExpression('>', this.expression, rhs.expression)) }
+    le(rhs: ColumnScalar<T>): Predicate { return new Predicate(new ComparisonExpression('<=', this.expression, rhs.expression)) }
+    ge(rhs: ColumnScalar<T>): Predicate { return new Predicate(new ComparisonExpression('>=', this.expression, rhs.expression)) }
 
-    isIn(rhs: SqlSet<T>): Predicate { return new Predicate(new IsInExpression(this.expression, rhs.expression)) }
+    //isIn(rhs: SqlSet<T>): Predicate { return new Predicate(new IsInExpression(this.expression, rhs.expression)) }
 }
 
-// The point being that this prohibits unwittingly calling inappropriate functions in query expressions.
-//export type Scalar<T> = { [P in keyof T]: Scalar<T[P]> } & ConcreteScalar<T>
-
-export type ScalarN<T> = { [P in keyof T]: ScalarN<T[P]> } & ConcreteScalar<T>
-export type Scalar4<T> = { [P in keyof T]: ScalarN<T[P]> } & ConcreteScalar<T>
-export type Scalar3<T> = { [P in keyof T]: Scalar4<T[P]> } & ConcreteScalar<T>
-export type Scalar2<T> = { [P in keyof T]: Scalar3<T[P]> } & ConcreteScalar<T>
-export type Scalar1<T> = { [P in keyof T]: Scalar2<T[P]> } & ConcreteScalar<T>
-export type Scalar<T> = { [P in keyof T]: Scalar1<T[P]> } & ConcreteScalar<T>
+export type Scalar1<T> = { [P in keyof T]: Scalar<T[P]> }
+export type Scalar<T> = Scalar1<T>
 
 class Predicate {
 
@@ -82,7 +75,7 @@ export class ConcreteSqlSet<E> {
 
 export type SqlSet<E> = ConcreteSqlSet<E> | Scalar<E[]>
 
-export function defineTable<E>(name: string, schema: E): SqlSet<E> {
+export function defineTable<E>(name: string, schema: E): ConcreteSqlSet<{ [P in keyof E]: ColumnScalar<E[P]> }> {
     var expression = new NamedSetExpression()
     expression.name = name
     return new ConcreteSqlSet(expression, schema)
@@ -100,8 +93,7 @@ var scalar: {
 export function from<S>(source: SqlSet<S>): Scalar<S> {
     if (!(source instanceof ConcreteSqlSet)) source = asSet(source)
     var evaluation = getCurrentEvaluation();
-    evaluation.expression.from = new FromExpression()
-    evaluation.expression.from.source = source.expression
+    evaluation.expression.from = new FromExpression(source.expression)
     var scalar = createScalar<S>(evaluation.expression.from, source.schema)
     return scalar
 }
@@ -113,8 +105,7 @@ export function join<S>(source: SqlSet<S>): { on: (condition: (s: Scalar<S>) => 
 
             var evaluation = getCurrentEvaluation();
             
-            var joinExpression = new JoinExpression()
-            joinExpression.source = source.expression
+            var joinExpression = new JoinExpression(source.expression)
             joinExpression.kind = 'join'
             var scalar = createScalar<S>(joinExpression, source.schema)
             joinExpression.on = condition(scalar).expression
@@ -125,8 +116,6 @@ export function join<S>(source: SqlSet<S>): { on: (condition: (s: Scalar<S>) => 
         }
     }
 }
-
-
 
 
 
@@ -148,6 +137,7 @@ export var query: {
         var result = monad()
 
         var evaluation = getCurrentEvaluation();
+        //evaluation.expression.select = result.expression
 
         var setExpression = new QueriedSetExpression()
         setExpression.definition = evaluation.expression
@@ -161,8 +151,4 @@ export var query: {
 
 export function asSet<E>(s: Scalar<E[]>): ConcreteSqlSet<E> {
     return s as any as ConcreteSqlSet<E>
-}
-
-function getSetExpression<T>(source: SqlSet<T>): SetExpression {
-    return (source as SqlSet<T>).expression
 }

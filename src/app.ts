@@ -37,23 +37,27 @@ class Entity {
     age = 32
 }
 
-// var myEntities: SqlSet<Entity> = defineTable("myEntities", new Entity());
-// var myCities: SqlSet<City> = defineTable("myCities", new City());
+var myEntities = defineTable("myEntities", new Entity());
+var myCities = defineTable("myCities", new City());
 
 // var myEntity = new Entity();
 
 
+var x = () => {
+    var x = from(myEntities);
+    //var y = join(myCities).on(c => x.name.eq(c.name).and(x.isIn(y.entities)));
+    //var z = join(y.entities);
 
-// var myQuery = query(() =>
-// {
-//     var x = from(myEntities);
-//     var y = join(myCities).on(c => x.name.eq(c.name).and(x.isIn(y.entities)));
-//     var z = join(y.entities);
+    // var p = { e: x, c: y }
 
-//     // var p = { e: x, c: y }
+    return x;
+}
 
-//     return {};
-// })
+var myQuery = query(x)
+
+var y = () => {
+    var y = from(myQuery)
+}
 
 //console.info(sqlify(myQuery.expression))
 

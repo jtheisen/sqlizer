@@ -38,6 +38,18 @@ export class SelectExpression {
     distinct: boolean
 }
 
+export class BindingExpression {
+    constructor(public source: SetExpression) { }
+}
+
+export class FromExpression extends BindingExpression {
+}
+
+export class JoinExpression extends BindingExpression {
+    kind: string
+    on: PredicateExpression
+}
+
 // Functions: FUN '(' [MODIFIERS] PARAMS ')' [ 'WITHIN GROUP' ( 'ORDER BY' ... ) ] [ 'OVER' ( [PARTITION], [ORDER], [ROWSRANGE] ) ]
 // CONVERT, CAST, PARSE
 
@@ -69,16 +81,10 @@ export class ApplicationExpression extends ScalarExpression {
     operands: ScalarExpression[]
 }
 
-export class BindingExpression extends ScalarExpression {
-    source: SetExpression
-}
-
-export class FromExpression extends BindingExpression {
-}
-
-export class JoinExpression extends BindingExpression {
-    kind: string
-    on: PredicateExpression
+export class AtomicExpression extends ScalarExpression {
+    constructor(public binding: BindingExpression) {
+        super()
+    }
 }
 
 export class MemberExpression extends ScalarExpression {
@@ -146,6 +152,7 @@ export class NotExpression extends PredicateExpression {
 
 class ExpressionVisitor {
     visitSelectExpression(expression: SelectExpression) {
+        this.visitScalarExpression(expression.select)
         this.visitFromExpression(expression.from)
         for (var join of expression.joins)
             this.visitJoinExpression(join)
@@ -164,12 +171,6 @@ class ExpressionVisitor {
     visitNamedExpression(expression: NamedSetExpression) { }
     //visitImmediateExpression(expression: ImmediateSetExpression) { this.unconsidered() }
 
-    visitScalarExpression(expression: ScalarExpression) {
-        if (expression instanceof BindingExpression)
-            this.visitBindingExpression(expression)
-        else
-            this.unconsidered()
-    }
     visitBindingExpression(expression: BindingExpression) {
         if (expression instanceof FromExpression)
             this.visitFromExpression(expression)
@@ -186,9 +187,32 @@ class ExpressionVisitor {
         this.visitPredicateExpression(expression.on)
     }
 
+    visitScalarExpression(expression: ScalarExpression) {
+        if (expression instanceof ScalarSubqueryExpression)
+            this.visitScalarSubqueryExpression(expression)
+        else if (expression instanceof AtomicExpression)
+            this.visitAtomicExpression(expression)
+        else if (expression instanceof ApplicationExpression)
+            this.visitApplicationExpression(expression)
+        else if (expression instanceof MemberExpression)
+            this.visitMemberExpression(expression)
+        else
+            this.unconsidered()
+    }
+    visitScalarSubqueryExpression(expression: ScalarSubqueryExpression) {
+        this.visitSelectExpression(expression.subquery)
+    }
+    visitAtomicExpression(expression: AtomicExpression) {
+    }
+    visitApplicationExpression(expression: ApplicationExpression) {
+        for (var operand of expression.operands)
+            this.visitScalarExpression(operand)
+    }
+    visitMemberExpression(expression: MemberExpression) {
+        this.visitScalarExpression(expression.parent)
+    }
+
     visitPredicateExpression(expression: PredicateExpression) {
-        console.info("here: " + expression)
-        
         if (expression instanceof ComparisonExpression)
             this.visitComparisonExpression(expression)
         else if (expression instanceof LogicalBinaryExpression)
@@ -239,7 +263,7 @@ function setWeights(run: Run) {
     for (var r of run.children) {
         if (typeof(r) === "string")
             weight += r.length
-        else {
+        else if (r.children.length) {
             setWeights(r)
             if (!r.weight) throw "Something's off"
             weight += r.weight
@@ -339,13 +363,16 @@ class SerializerVisitor extends ExpressionVisitor {
         return result
     }
 
+    
+
     visitSelectExpression(expression: SelectExpression) {
         this.run(() => {
             this.write('SELECT')
-            this.visitFromExpression(expression.from)
+            this.visitScalarExpression(expression.select)
         })
         
         this.run(() => {
+            this.visitFromExpression(expression.from)
             for (var join of expression.joins) {
                 this.run(() => this.visitJoinExpression(join))
             }
@@ -360,7 +387,6 @@ class SerializerVisitor extends ExpressionVisitor {
             this.write(identifier ? identifier : '*')
         })
     }
-
     visitJoinExpression(expression: JoinExpression) {
         this.run(() => {
             this.write(expression.kind)
@@ -410,6 +436,37 @@ class SerializerVisitor extends ExpressionVisitor {
     }
     visitExistsExpression(expression: ExistsExpression) {
         this.visitSetExpression(expression.operand)
+    }
+
+    // Scalars
+
+    visitAtomicExpression(expression: AtomicExpression) {
+        var identifier = this.identifiers.get(expression.binding)
+        if (!identifier) throw "Unexpectedly missing identifier."
+        this.write(identifier)
+    }
+    visitApplicationExpression(expression: ApplicationExpression) {
+        this.write(expression.operator.name)
+        this.write('(')
+        this.run(() => {
+            var hadFirst = false
+            for (var op of expression.operands) {
+                if (hadFirst) this.write(',')
+                this.visitScalarExpression(op)
+                hadFirst = true
+            }
+            this.write(')')
+        })
+    }
+    visitScalarSubqueryExpression(expression: ScalarSubqueryExpression) {
+        this.write('(')
+        this.visitSelectExpression(expression.subquery)
+        this.write(')')
+    }
+    visitMemberExpression(expression: MemberExpression) {
+        this.visitScalarExpression(expression.parent)
+        this.write('.')
+        this.write(expression.member)
     }
 
     run(nested: () => void) {
