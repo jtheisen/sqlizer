@@ -33,7 +33,7 @@ class City {
 
 @Table
 class Entity {
-    name?: string
+    name?: string = defString()
     age = 32
 }
 
@@ -43,23 +43,24 @@ var myCities = defineTable("myCities", new City());
 // var myEntity = new Entity();
 
 
-var x = () => {
+var temp = () => {
     var x = from(myEntities);
     //var y = join(myCities).on(c => x.name.eq(c.name).and(x.isIn(y.entities)));
     //var z = join(y.entities);
 
     // var p = { e: x, c: y }
 
-    return x;
+    return { age: x.age, name: x.name };
 }
 
-var myQuery = query(x)
+var myQuery = query(temp)
 
-var y = () => {
-    var y = from(myQuery)
-}
+// var y = () => {
+//     var y = from(myQuery)
+//     y.x.age.eq(y.x.age)
+// }
 
-//console.info(sqlify(myQuery.expression))
+console.info(sqlify(myQuery.expression))
 
 // tape('', t => {
 // }

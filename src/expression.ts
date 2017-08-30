@@ -94,6 +94,13 @@ export class MemberExpression extends ScalarExpression {
     ) { super() }
 }
 
+export class ObjectExpression extends ScalarExpression {
+    constructor(
+        public keys: string[],
+        public map: { [key: string]: ScalarExpression }
+    ) { super() }
+}
+
 export class PredicateExpression {
 }
 
@@ -196,6 +203,8 @@ class ExpressionVisitor {
             this.visitApplicationExpression(expression)
         else if (expression instanceof MemberExpression)
             this.visitMemberExpression(expression)
+        else if (expression instanceof ObjectExpression)
+            this.visitObjectExpression(expression)
         else
             this.unconsidered()
     }
@@ -210,6 +219,10 @@ class ExpressionVisitor {
     }
     visitMemberExpression(expression: MemberExpression) {
         this.visitScalarExpression(expression.parent)
+    }
+    visitObjectExpression(expression: ObjectExpression) {
+        for (var key of expression.keys)
+            this.visitScalarExpression(expression.map[key])
     }
 
     visitPredicateExpression(expression: PredicateExpression) {
@@ -368,6 +381,7 @@ class SerializerVisitor extends ExpressionVisitor {
     visitSelectExpression(expression: SelectExpression) {
         this.run(() => {
             this.write('SELECT')
+            console.info("visiting scalar expression in select " + (expression.select as any).__proto__.constructor.name)
             this.visitScalarExpression(expression.select)
         })
         
@@ -441,6 +455,7 @@ class SerializerVisitor extends ExpressionVisitor {
     // Scalars
 
     visitAtomicExpression(expression: AtomicExpression) {
+        console.info("visiting atomic expression")
         var identifier = this.identifiers.get(expression.binding)
         if (!identifier) throw "Unexpectedly missing identifier."
         this.write(identifier)
@@ -467,6 +482,19 @@ class SerializerVisitor extends ExpressionVisitor {
         this.visitScalarExpression(expression.parent)
         this.write('.')
         this.write(expression.member)
+    }
+    visitObjectExpression(expression: ObjectExpression) {
+        this.write('{')
+        var hadFirst = false
+        for (var key of expression.keys) {
+            if (hadFirst) this.write(',')
+            hadFirst = true
+            console.info((expression.keys.length as any).__proto__.constructor.name)
+            this.write(key)
+            this.write(':')
+            this.visitScalarExpression(expression.map[key])
+        }
+        this.write('}')
     }
 
     run(nested: () => void) {

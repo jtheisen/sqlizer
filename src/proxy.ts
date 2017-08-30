@@ -15,7 +15,6 @@ export function getTrivialProxySchema(proxyPrototype: object): ProxySchema {
 }
 
 export function createProxy(schema: ProxySchema) {
-    var x: PropertyDescriptorMap
     var proxy = Object.create(schema.proxyPrototype)
     for (var prop of schema.properties) {
         var getter = function() { return createProxy(schema.getPropertySchema(prop)) }

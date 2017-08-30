@@ -1,6 +1,7 @@
 import { createProxy, getTrivialProxySchema, ProxySchema } from './proxy';
 import { EntityDescriptor } from './entities';
 import {
+    AtomicExpression,
     BindingExpression,
     ComparisonExpression,
     ExistsExpression,
@@ -10,6 +11,7 @@ import {
     LogicalBinaryExpression,
     MemberExpression,
     NamedSetExpression,
+    ObjectExpression,
     PredicateExpression,
     QueriedSetExpression,
     ScalarExpression,
@@ -33,7 +35,7 @@ function getProxySchemaForObject(target: any) {
     }
 }
 
-function createScalar<T>(expression: ScalarExpression, target: any): Scalar<T> {
+function createScalar<T>(expression: AtomicExpression, target: any): Scalar<T> {
     var scalar = createProxy(getProxySchemaForObject(target))
     scalar.expression = expression
     return scalar
@@ -53,8 +55,7 @@ export class ColumnScalar<T> {
     //isIn(rhs: SqlSet<T>): Predicate { return new Predicate(new IsInExpression(this.expression, rhs.expression)) }
 }
 
-export type Scalar1<T> = { [P in keyof T]: Scalar<T[P]> }
-export type Scalar<T> = Scalar1<T>
+export type Scalar<T> = T
 
 class Predicate {
 
@@ -68,17 +69,17 @@ class Predicate {
 var SqlTrue: Predicate;
 
 export class ConcreteSqlSet<E> {
-    constructor(public expression: SetExpression, public schema: any) { }
+    constructor(public expression: SetExpression, public schema: any, public isColumnar: boolean = false) { }
 
     any(): Predicate { return new Predicate(new ExistsExpression(this.expression)) }
 }
 
-export type SqlSet<E> = ConcreteSqlSet<E> | Scalar<E[]>
+export type SqlSet<E> = ConcreteSqlSet<E> // | Scalar<E[]>
 
 export function defineTable<E>(name: string, schema: E): ConcreteSqlSet<{ [P in keyof E]: ColumnScalar<E[P]> }> {
     var expression = new NamedSetExpression()
     expression.name = name
-    return new ConcreteSqlSet(expression, schema)
+    return new ConcreteSqlSet(expression, schema, true)
 }
 
 function immediate<T>(value: T): Scalar<T> { throw null; }
@@ -89,12 +90,12 @@ var scalar: {
     <E>(element: Scalar<E>): Scalar<E>,
 } = (e: any) => e
 
-
 export function from<S>(source: SqlSet<S>): Scalar<S> {
     if (!(source instanceof ConcreteSqlSet)) source = asSet(source)
     var evaluation = getCurrentEvaluation();
-    evaluation.expression.from = new FromExpression(source.expression)
-    var scalar = createScalar<S>(evaluation.expression.from, source.schema)
+    var fromExpression = evaluation.expression.from = new FromExpression(source.expression)
+    var atomicExpression = new AtomicExpression(fromExpression)
+    var scalar = createScalar<S>(atomicExpression, source.schema)
     return scalar
 }
 
@@ -107,7 +108,8 @@ export function join<S>(source: SqlSet<S>): { on: (condition: (s: Scalar<S>) => 
             
             var joinExpression = new JoinExpression(source.expression)
             joinExpression.kind = 'join'
-            var scalar = createScalar<S>(joinExpression, source.schema)
+            var atomicExpression = new AtomicExpression(joinExpression)
+            var scalar = createScalar<S>(atomicExpression, source.schema)
             joinExpression.on = condition(scalar).expression
         
             evaluation.expression.joins.push(joinExpression)
@@ -117,7 +119,27 @@ export function join<S>(source: SqlSet<S>): { on: (condition: (s: Scalar<S>) => 
     }
 }
 
+function hasCtor(o: any) {
+    return o.__proto__ && o.__proto__.constructor !== Object
+}
 
+function getScalarExpressionFromScalar<T>(e: T): ScalarExpression {
+    if (e instanceof ColumnScalar)
+        return e.expression
+    else if (e instanceof Array) {
+        throw "Arrays are not allowed in this context."
+    } else if (hasCtor(e)) {
+        throw "Only plain Javascript objects are allowed in this context."
+    } else {
+        var result = new ObjectExpression([], {})
+        for (var p in e) {
+            var v = e[p]
+            result.keys.push(p)
+            result.map[p] = getScalarExpressionFromScalar(v)
+        }
+        return result
+    }
+}
 
 var evaluationStack: {
     expression: SelectExpression
@@ -137,7 +159,7 @@ export var query: {
         var result = monad()
 
         var evaluation = getCurrentEvaluation();
-        //evaluation.expression.select = result.expression
+        evaluation.expression.select = getScalarExpressionFromScalar(result)
 
         var setExpression = new QueriedSetExpression()
         setExpression.definition = evaluation.expression

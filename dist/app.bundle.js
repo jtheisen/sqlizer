@@ -60,189 +60,11 @@
 /******/ 	__webpack_require__.p = "";
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 0);
+/******/ 	return __webpack_require__(__webpack_require__.s = 1);
 /******/ })
 /************************************************************************/
 /******/ ([
 /* 0 */
-/***/ (function(module, exports, __webpack_require__) {
-
-module.exports = __webpack_require__(1);
-
-
-/***/ }),
-/* 1 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
-    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
-    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
-    return c > 3 && r && Object.defineProperty(target, key, r), r;
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-const fluent_1 = __webpack_require__(2);
-const entities_1 = __webpack_require__(5);
-__webpack_require__(6);
-let City = class City {
-    constructor() {
-        this.name = entities_1.defString();
-    }
-};
-City = __decorate([
-    entities_1.Table
-], City);
-let Entity = class Entity {
-    constructor() {
-        this.age = 32;
-    }
-};
-Entity = __decorate([
-    entities_1.Table
-], Entity);
-var myEntities = fluent_1.defineTable("myEntities", new Entity());
-var myCities = fluent_1.defineTable("myCities", new City());
-var myQuery = fluent_1.query(() => {
-    var x = fluent_1.from(myEntities);
-    return 42;
-});
-
-
-/***/ }),
-/* 2 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-const proxy_1 = __webpack_require__(3);
-const expression_1 = __webpack_require__(4);
-function getProxySchemaForObject(target) {
-    return {
-        properties: Object.keys(target),
-        proxyPrototype: ColumnScalar.prototype,
-        getPropertySchema(name) {
-            return getProxySchemaForObject(target[name]);
-        }
-    };
-}
-function createScalar(expression, target) {
-    var scalar = proxy_1.createProxy(getProxySchemaForObject(target));
-    scalar.expression = expression;
-    return scalar;
-}
-class ColumnScalar {
-    eq(rhs) { return new Predicate(new expression_1.ComparisonExpression('=', this.expression, rhs.expression)); }
-    ne(rhs) { return new Predicate(new expression_1.ComparisonExpression('<>', this.expression, rhs.expression)); }
-    lt(rhs) { return new Predicate(new expression_1.ComparisonExpression('<', this.expression, rhs.expression)); }
-    gt(rhs) { return new Predicate(new expression_1.ComparisonExpression('>', this.expression, rhs.expression)); }
-    le(rhs) { return new Predicate(new expression_1.ComparisonExpression('<=', this.expression, rhs.expression)); }
-    ge(rhs) { return new Predicate(new expression_1.ComparisonExpression('>=', this.expression, rhs.expression)); }
-}
-exports.ColumnScalar = ColumnScalar;
-class Predicate {
-    constructor(expression) {
-        this.expression = expression;
-    }
-    and(rhs) { return new Predicate(new expression_1.LogicalBinaryExpression('AND', this.expression, rhs.expression)); }
-    or(rhs) { throw new Predicate(new expression_1.LogicalBinaryExpression('OR', this.expression, rhs.expression)); }
-}
-var SqlTrue;
-class ConcreteSqlSet {
-    constructor(expression, schema) {
-        this.expression = expression;
-        this.schema = schema;
-    }
-    any() { return new Predicate(new expression_1.ExistsExpression(this.expression)); }
-}
-exports.ConcreteSqlSet = ConcreteSqlSet;
-function defineTable(name, schema) {
-    var expression = new expression_1.NamedSetExpression();
-    expression.name = name;
-    return new ConcreteSqlSet(expression, schema);
-}
-exports.defineTable = defineTable;
-function immediate(value) { throw null; }
-var scalar = (e) => e;
-function from(source) {
-    if (!(source instanceof ConcreteSqlSet))
-        source = asSet(source);
-    var evaluation = getCurrentEvaluation();
-    evaluation.expression.from = new expression_1.FromExpression(source.expression);
-    var scalar = createScalar(evaluation.expression.from, source.schema);
-    return scalar;
-}
-exports.from = from;
-function join(source) {
-    return {
-        on: (condition) => {
-            if (!(source instanceof ConcreteSqlSet))
-                source = asSet(source);
-            var evaluation = getCurrentEvaluation();
-            var joinExpression = new expression_1.JoinExpression(source.expression);
-            joinExpression.kind = 'join';
-            var scalar = createScalar(joinExpression, source.schema);
-            joinExpression.on = condition(scalar).expression;
-            evaluation.expression.joins.push(joinExpression);
-            return scalar;
-        }
-    };
-}
-exports.join = join;
-var evaluationStack = [];
-function getCurrentEvaluation() {
-    return evaluationStack[evaluationStack.length - 1];
-}
-exports.query = (monad) => {
-    evaluationStack.push({ expression: new expression_1.SelectExpression() });
-    try {
-        var result = monad();
-        var evaluation = getCurrentEvaluation();
-        var setExpression = new expression_1.QueriedSetExpression();
-        setExpression.definition = evaluation.expression;
-        return new ConcreteSqlSet(setExpression, result);
-    }
-    finally {
-        evaluationStack.pop();
-    }
-};
-function asSet(s) {
-    return s;
-}
-exports.asSet = asSet;
-
-
-/***/ }),
-/* 3 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-function getTrivialProxySchema(proxyPrototype) {
-    return {
-        properties: [],
-        proxyPrototype: proxyPrototype,
-        getPropertySchema(name) { throw "Internal error: Trivial schema has no properties."; }
-    };
-}
-exports.getTrivialProxySchema = getTrivialProxySchema;
-function createProxy(schema) {
-    var x;
-    var proxy = Object.create(schema.proxyPrototype);
-    for (var prop of schema.properties) {
-        var getter = function () { return createProxy(schema.getPropertySchema(prop)); };
-        Object.defineProperty(proxy, prop, { get: getter });
-    }
-    return proxy;
-}
-exports.createProxy = createProxy;
-
-
-/***/ }),
-/* 4 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -314,6 +136,14 @@ class MemberExpression extends ScalarExpression {
     }
 }
 exports.MemberExpression = MemberExpression;
+class ObjectExpression extends ScalarExpression {
+    constructor(keys, map) {
+        super();
+        this.keys = keys;
+        this.map = map;
+    }
+}
+exports.ObjectExpression = ObjectExpression;
 class PredicateExpression {
 }
 exports.PredicateExpression = PredicateExpression;
@@ -404,6 +234,8 @@ class ExpressionVisitor {
             this.visitApplicationExpression(expression);
         else if (expression instanceof MemberExpression)
             this.visitMemberExpression(expression);
+        else if (expression instanceof ObjectExpression)
+            this.visitObjectExpression(expression);
         else
             this.unconsidered();
     }
@@ -418,6 +250,10 @@ class ExpressionVisitor {
     }
     visitMemberExpression(expression) {
         this.visitScalarExpression(expression.parent);
+    }
+    visitObjectExpression(expression) {
+        for (var key of expression.keys)
+            this.visitScalarExpression(expression.map[key]);
     }
     visitPredicateExpression(expression) {
         if (expression instanceof ComparisonExpression)
@@ -558,6 +394,7 @@ class SerializerVisitor extends ExpressionVisitor {
     visitSelectExpression(expression) {
         this.run(() => {
             this.write('SELECT');
+            console.info("visiting scalar expression in select " + expression.select.__proto__.constructor.name);
             this.visitScalarExpression(expression.select);
         });
         this.run(() => {
@@ -623,6 +460,7 @@ class SerializerVisitor extends ExpressionVisitor {
         this.visitSetExpression(expression.operand);
     }
     visitAtomicExpression(expression) {
+        console.info("visiting atomic expression");
         var identifier = this.identifiers.get(expression.binding);
         if (!identifier)
             throw "Unexpectedly missing identifier.";
@@ -651,6 +489,20 @@ class SerializerVisitor extends ExpressionVisitor {
         this.visitScalarExpression(expression.parent);
         this.write('.');
         this.write(expression.member);
+    }
+    visitObjectExpression(expression) {
+        this.write('{');
+        var hadFirst = false;
+        for (var key of expression.keys) {
+            if (hadFirst)
+                this.write(',');
+            hadFirst = true;
+            console.info(expression.keys.length.__proto__.constructor.name);
+            this.write(key);
+            this.write(':');
+            this.visitScalarExpression(expression.map[key]);
+        }
+        this.write('}');
     }
     run(nested) {
         var previousRun = this.stack[this.stack.length - 1];
@@ -686,6 +538,224 @@ function sqlify(source) {
     return stringify(tokenTree);
 }
 exports.sqlify = sqlify;
+
+
+/***/ }),
+/* 1 */
+/***/ (function(module, exports, __webpack_require__) {
+
+module.exports = __webpack_require__(2);
+
+
+/***/ }),
+/* 2 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const expression_1 = __webpack_require__(0);
+const fluent_1 = __webpack_require__(3);
+const entities_1 = __webpack_require__(5);
+__webpack_require__(6);
+let City = class City {
+    constructor() {
+        this.name = entities_1.defString();
+    }
+};
+City = __decorate([
+    entities_1.Table
+], City);
+let Entity = class Entity {
+    constructor() {
+        this.name = entities_1.defString();
+        this.age = 32;
+    }
+};
+Entity = __decorate([
+    entities_1.Table
+], Entity);
+var myEntities = fluent_1.defineTable("myEntities", new Entity());
+var myCities = fluent_1.defineTable("myCities", new City());
+var temp = () => {
+    var x = fluent_1.from(myEntities);
+    return { age: x.age, name: x.name };
+};
+var myQuery = fluent_1.query(temp);
+console.info(expression_1.sqlify(myQuery.expression));
+
+
+/***/ }),
+/* 3 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+const proxy_1 = __webpack_require__(4);
+const expression_1 = __webpack_require__(0);
+function getProxySchemaForObject(target) {
+    return {
+        properties: Object.keys(target),
+        proxyPrototype: ColumnScalar.prototype,
+        getPropertySchema(name) {
+            return getProxySchemaForObject(target[name]);
+        }
+    };
+}
+function createScalar(expression, target, makeColumnar = false) {
+    if (makeColumnar)
+        target = getColumnar(expression, target);
+    var scalar = proxy_1.createProxy(getProxySchemaForObject(target));
+    scalar.expression = expression;
+    return scalar;
+}
+function getColumnar(expression, target) {
+    var result = {};
+    for (var key in target) {
+        let scalar = result[key] = new ColumnScalar();
+        scalar.expression = expression;
+    }
+    return result;
+}
+class ColumnScalar {
+    eq(rhs) { return new Predicate(new expression_1.ComparisonExpression('=', this.expression, rhs.expression)); }
+    ne(rhs) { return new Predicate(new expression_1.ComparisonExpression('<>', this.expression, rhs.expression)); }
+    lt(rhs) { return new Predicate(new expression_1.ComparisonExpression('<', this.expression, rhs.expression)); }
+    gt(rhs) { return new Predicate(new expression_1.ComparisonExpression('>', this.expression, rhs.expression)); }
+    le(rhs) { return new Predicate(new expression_1.ComparisonExpression('<=', this.expression, rhs.expression)); }
+    ge(rhs) { return new Predicate(new expression_1.ComparisonExpression('>=', this.expression, rhs.expression)); }
+}
+exports.ColumnScalar = ColumnScalar;
+class Predicate {
+    constructor(expression) {
+        this.expression = expression;
+    }
+    and(rhs) { return new Predicate(new expression_1.LogicalBinaryExpression('AND', this.expression, rhs.expression)); }
+    or(rhs) { throw new Predicate(new expression_1.LogicalBinaryExpression('OR', this.expression, rhs.expression)); }
+}
+var SqlTrue;
+class ConcreteSqlSet {
+    constructor(expression, schema, isColumnar = false) {
+        this.expression = expression;
+        this.schema = schema;
+        this.isColumnar = isColumnar;
+    }
+    any() { return new Predicate(new expression_1.ExistsExpression(this.expression)); }
+}
+exports.ConcreteSqlSet = ConcreteSqlSet;
+function defineTable(name, schema) {
+    var expression = new expression_1.NamedSetExpression();
+    expression.name = name;
+    return new ConcreteSqlSet(expression, schema, true);
+}
+exports.defineTable = defineTable;
+function immediate(value) { throw null; }
+var scalar = (e) => e;
+function from(source) {
+    if (!(source instanceof ConcreteSqlSet))
+        source = asSet(source);
+    var evaluation = getCurrentEvaluation();
+    var fromExpression = evaluation.expression.from = new expression_1.FromExpression(source.expression);
+    var atomicExpression = new expression_1.AtomicExpression(fromExpression);
+    var scalar = createScalar(atomicExpression, source.schema, source.isColumnar);
+    return scalar;
+}
+exports.from = from;
+function join(source) {
+    return {
+        on: (condition) => {
+            if (!(source instanceof ConcreteSqlSet))
+                source = asSet(source);
+            var evaluation = getCurrentEvaluation();
+            var joinExpression = new expression_1.JoinExpression(source.expression);
+            joinExpression.kind = 'join';
+            var atomicExpression = new expression_1.AtomicExpression(joinExpression);
+            var scalar = createScalar(atomicExpression, source.schema, source.isColumnar);
+            joinExpression.on = condition(scalar).expression;
+            evaluation.expression.joins.push(joinExpression);
+            return scalar;
+        }
+    };
+}
+exports.join = join;
+function hasCtor(o) {
+    return o.__proto__ && o.__proto__.constructor !== Object;
+}
+function getScalarExpressionFromScalar(e) {
+    if (e instanceof ColumnScalar)
+        return e.expression;
+    else if (e instanceof Array) {
+        throw "Arrays are not allowed in this context.";
+    }
+    else if (hasCtor(e)) {
+        throw "Only plain Javascript objects are allowed in this context.";
+    }
+    else {
+        var result = new expression_1.ObjectExpression([], {});
+        for (var p in e) {
+            var v = e[p];
+            result.keys.push(p);
+            result.map[p] = getScalarExpressionFromScalar(v);
+        }
+        return result;
+    }
+}
+var evaluationStack = [];
+function getCurrentEvaluation() {
+    return evaluationStack[evaluationStack.length - 1];
+}
+exports.query = (monad) => {
+    evaluationStack.push({ expression: new expression_1.SelectExpression() });
+    try {
+        var result = monad();
+        var evaluation = getCurrentEvaluation();
+        evaluation.expression.select = getScalarExpressionFromScalar(result);
+        var setExpression = new expression_1.QueriedSetExpression();
+        setExpression.definition = evaluation.expression;
+        return new ConcreteSqlSet(setExpression, result);
+    }
+    finally {
+        evaluationStack.pop();
+    }
+};
+function asSet(s) {
+    return s;
+}
+exports.asSet = asSet;
+
+
+/***/ }),
+/* 4 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+function getTrivialProxySchema(proxyPrototype) {
+    return {
+        properties: [],
+        proxyPrototype: proxyPrototype,
+        getPropertySchema(name) { throw "Internal error: Trivial schema has no properties."; }
+    };
+}
+exports.getTrivialProxySchema = getTrivialProxySchema;
+function createProxy(schema) {
+    var x;
+    var proxy = Object.create(schema.proxyPrototype);
+    for (var prop of schema.properties) {
+        var getter = function () { return createProxy(schema.getPropertySchema(prop)); };
+        Object.defineProperty(proxy, prop, { get: getter });
+    }
+    return proxy;
+}
+exports.createProxy = createProxy;
 
 
 /***/ }),
