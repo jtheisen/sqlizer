@@ -1,6 +1,6 @@
 import { MemberExpression, ScalarExpression, sqlify } from './expression';
 import { asSet, defineTable, from, join, query, Scalar, SqlSet } from './fluent';
-import { Table, defString } from './entities'
+import { defReference, defString, Table } from './entities';
 import * as tape from 'tape';
 import 'reflect-metadata';
 
@@ -27,36 +27,31 @@ It does not yet, however, contain the following:
 
 
 @Table
-class City {
-    name = defString()
+class Invoice {
+    invoiceNo = defString()
+    orderNo = defString()
+
+    order = defReference(Order)
 }
 
 @Table
-class Entity {
-    name?: string = defString()
-    age = 32
+class Order {
+    orderNo = defString()
+    
+    //invoices = def
 }
 
-var myEntities = defineTable("myEntities", new Entity());
-var myCities = defineTable("myCities", new City());
+var invoices = defineTable("invoices", new Invoice());
+var orders = defineTable("orders", new Order());
 
 // var myEntity = new Entity();
 
 
 var temp = () => {
-    var x = from(myEntities);
+    var o = from(orders);
+    var i = join(invoices).on(i => o.orderNo.eq(i.orderNo));
 
-    console.info((x as any).expression)
-    console.info((x.name as any).expression)
-    
-    console.info((x.name as any).expression.parent.binding.source.name)
-
-    //var y = join(myCities).on(c => x.name.eq(c.name).and(x.isIn(y.entities)));
-    //var z = join(y.entities);
-
-    // var p = { e: x, c: y }
-
-    return { age: x.age, name: x.name };
+    return { o, i };
 }
 
 var myQuery = query(temp)

@@ -564,31 +564,30 @@ const expression_1 = __webpack_require__(0);
 const fluent_1 = __webpack_require__(3);
 const entities_1 = __webpack_require__(5);
 __webpack_require__(6);
-let City = class City {
+let Invoice = class Invoice {
     constructor() {
-        this.name = entities_1.defString();
+        this.invoiceNo = entities_1.defString();
+        this.orderNo = entities_1.defString();
+        this.order = entities_1.defReference(Order);
     }
 };
-City = __decorate([
+Invoice = __decorate([
     entities_1.Table
-], City);
-let Entity = class Entity {
+], Invoice);
+let Order = class Order {
     constructor() {
-        this.name = entities_1.defString();
-        this.age = 32;
+        this.orderNo = entities_1.defString();
     }
 };
-Entity = __decorate([
+Order = __decorate([
     entities_1.Table
-], Entity);
-var myEntities = fluent_1.defineTable("myEntities", new Entity());
-var myCities = fluent_1.defineTable("myCities", new City());
+], Order);
+var invoices = fluent_1.defineTable("invoices", new Invoice());
+var orders = fluent_1.defineTable("orders", new Order());
 var temp = () => {
-    var x = fluent_1.from(myEntities);
-    console.info(x.expression);
-    console.info(x.name.expression);
-    console.info(x.name.expression.parent.binding.source.name);
-    return { age: x.age, name: x.name };
+    var o = fluent_1.from(orders);
+    var i = fluent_1.join(invoices).on(i => o.orderNo.eq(i.orderNo));
+    return { o, i };
 };
 var myQuery = fluent_1.query(temp);
 console.info(expression_1.sqlify(myQuery.expression));
