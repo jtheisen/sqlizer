@@ -550,41 +550,29 @@ module.exports = __webpack_require__(2);
 
 "use strict";
 
-var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
-    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
-    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
-    return c > 3 && r && Object.defineProperty(target, key, r), r;
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 const expression_1 = __webpack_require__(0);
 const fluent_1 = __webpack_require__(3);
 const entities_1 = __webpack_require__(5);
 __webpack_require__(6);
-let Order = class Order {
+class Order {
     constructor() {
         this.orderNo = entities_1.defString();
     }
-};
-Order = __decorate([
-    entities_1.Table
-], Order);
-let Invoice = class Invoice {
+}
+class Invoice {
     constructor() {
         this.invoiceNo = entities_1.defString();
         this.orderNo = entities_1.defString();
         this.order = entities_1.defReference(Order);
     }
-};
-Invoice = __decorate([
-    entities_1.Table
-], Invoice);
+}
 var invoices = fluent_1.defineTable("invoices", new Invoice());
 var orders = fluent_1.defineTable("orders", new Order());
 var temp = () => {
     var o = fluent_1.from(orders);
     var i = fluent_1.join(invoices).on(i => o.orderNo.eq(i.orderNo));
-    return { ono: o.orderNo, ino: i.invoiceNo };
+    return { ono: o.orderNo, ino: i.invoiceNo, extra: i.order.orderNo };
 };
 var myQuery = fluent_1.query(temp);
 console.info(expression_1.sqlify(myQuery.expression));
@@ -765,7 +753,6 @@ class ProbeMock {
 }
 var entities = {};
 function Table(constructor) {
-    scanEntity(constructor);
 }
 exports.Table = Table;
 var areProbing = false;

@@ -25,14 +25,14 @@ It does not yet, however, contain the following:
 
 //var x: PropertyDescriptor
 
-@Table
+//@Table
 class Order {
     orderNo = defString()
     
     //invoices = def
 }
 
-@Table
+//@Table
 class Invoice {
     invoiceNo = defString()
     orderNo = defString()
@@ -50,7 +50,7 @@ var temp = () => {
     var o = from(orders);
     var i = join(invoices).on(i => o.orderNo.eq(i.orderNo));
 
-    return { ono: o.orderNo, ino: i.invoiceNo };
+    return { ono: o.orderNo, ino: i.invoiceNo, extra: i.order.orderNo };
 }
 
 var myQuery = query(temp)

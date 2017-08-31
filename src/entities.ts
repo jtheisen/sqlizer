@@ -21,7 +21,7 @@ var entities: { [n: string]: EntityDescriptor } = { }
 
 
 export function Table(constructor: { new(): any }) {
-    scanEntity(constructor)
+    //scanEntity(constructor)
 }
 
 var areProbing = false

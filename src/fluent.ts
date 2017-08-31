@@ -57,7 +57,7 @@ export class ColumnScalar<T> {
     //isIn(rhs: SqlSet<T>): Predicate { return new Predicate(new IsInExpression(this.expression, rhs.expression)) }
 }
 
-export type Scalar<T> = T
+export type Scalar<T> = T & ColumnScalar<T>
 
 class Predicate {
 
@@ -78,7 +78,7 @@ export class ConcreteSqlSet<E> {
 
 export type SqlSet<E> = ConcreteSqlSet<E> // | Scalar<E[]>
 
-export function defineTable<E>(name: string, schema: E): ConcreteSqlSet<{ [P in keyof E]: ColumnScalar<E[P]> }> {
+export function defineTable<E>(name: string, schema: E): ConcreteSqlSet<{ [P in keyof E]: Scalar<E[P]> }> {
     var expression = new NamedSetExpression()
     expression.name = name
     return new ConcreteSqlSet(expression, schema)
