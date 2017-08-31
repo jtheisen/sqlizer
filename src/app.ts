@@ -1,6 +1,5 @@
 import { MemberExpression, ScalarExpression, sqlify } from './expression';
-import { asSet, defineTable, from, join, query, Scalar, SqlSet } from './fluent';
-//import { defReference, defString, Table } from './entities';
+import { asSet, ConcreteSqlSet, defineTable, from, join, query, Scalar, SqlSet } from './fluent';
 import * as tape from 'tape';
 import 'reflect-metadata';
 
@@ -25,14 +24,18 @@ It does not yet, however, contain the following:
 
 //var x: PropertyDescriptor
 
-//@Table
+function toMany<T>(ctor: { new (): T }): T[] {
+    var result: any = []
+    result.elementConstructor = ctor
+    return result
+}
+
 class Order {
     orderNo = ''
     
-    invoices: Invoice[] = []
+    invoices = toMany(Invoice)
 }
 
-//@Table
 class Invoice {
     invoiceNo = ''
     orderNo = ''
@@ -45,23 +48,28 @@ var orders = defineTable("orders", new Order());
 
 // var myEntity = new Entity();
 
+function processQuery<T>(set: ConcreteSqlSet<T>)
+{
+    console.info(sqlify(set.expression))
+}
 
-var temp = () => {
+
+
+processQuery(query(() => {
     var o = from(orders);
     var i = join(invoices).on(i => o.orderNo.eq(i.orderNo));
 
     return { ono: o.orderNo, ino: i.invoiceNo, extra: i.order.orderNo };
-}
+}))
 
-var myQuery = query(temp)
+processQuery(query(() => {
+    var o = from(orders);
+    var i = from(o.invoices)
 
-// var y = () => {
-//     var y = from(myQuery)
-//     y.x.age.eq(y.x.age)
-// }
-
-console.info(sqlify(myQuery.expression))
-
-// tape('', t => {
-// }
-// )
+    console.info("ctor next")
+    console.info((o.invoices as any).elementConstructor)
+    console.info((i as any).expression)
+    console.info(i.invoiceNo)
+    
+    return { ono: o.orderNo, ino: i.invoiceNo };
+}))

@@ -1,5 +1,4 @@
-import { createProxy, getTrivialProxySchema, ProxySchema } from './proxy';
-//import { EntityDescriptor } from './entities';
+import { createProxy, ProxySchema } from './proxy';
 import {
     AtomicExpression,
     BindingExpression,
@@ -14,28 +13,38 @@ import {
     ObjectExpression,
     PredicateExpression,
     QueriedSetExpression,
+    ScalarAsSetExpression,
     ScalarExpression,
     SelectExpression,
     SetExpression,
 } from './expression';
 
-// case 1: creating a scalar from a javascript object, eg. through a map
-//   scan the object and create a proxy that returns proxied objects from its getters for all props
-// case 2: creating a scalar from a from or join expression
-//
-
-
-function getProxySchemaForObject(expression: ScalarExpression, target: any) {
-    return {
-        properties: Object.keys(target),
-        proxyPrototype: ColumnScalar.prototype,
-        process(proxy: any) {
-            proxy.expression = expression
-        },
-        getPropertySchema(name: string) {
-            return getProxySchemaForObject(new MemberExpression(expression, name), target[name])
-        }
+function getSetSchema(): ProxySchema {
+    var result = new ProxySchema()
+    result.target = { }
+    result.proxyPrototype = ColumnScalar.prototype
+    result.process = (proxy: any) => {
     }
+    result.getPropertySchema = undefined
+    return result
+}
+
+function getProxySchemaForObject(expression: ScalarExpression, target: any): ProxySchema {
+    var result = new ProxySchema()
+    result.target = target,
+    result.proxyPrototype = ColumnScalar.prototype,
+    result.process = (proxy: any) => {
+        proxy.expression = expression
+    }
+    result.getPropertySchema = (name: string): ProxySchema => {
+        var ntarget = target[name]
+        if (Array.isArray(ntarget))
+            return getSetSchema()
+        else
+            return getProxySchemaForObject(new MemberExpression(expression, name), target[name])
+    }
+        
+    return result
 }
 
 function createScalar<T>(expression: AtomicExpression, target: any): Scalar<T> {
@@ -86,39 +95,38 @@ export function defineTable<E>(name: string, schema: E): ConcreteSqlSet<{ [P in 
 
 function immediate<T>(value: T): Scalar<T> { throw null; }
 
+type SqlSetLike<S> = SqlSet<S> | S[]
 
-var scalar: {
-    <E>(element: E): Scalar<E>,
-    <E>(element: Scalar<E>): Scalar<E>,
-} = (e: any) => e
-
-export function from<S>(source: SqlSet<S>): Scalar<S> {
+export function from<S>(source: SqlSetLike<S>): Scalar<S> {
     if (!(source instanceof ConcreteSqlSet)) source = asSet(source)
     var evaluation = getCurrentEvaluation();
+    if (evaluation.expression.from) return joinImpl(source)
     var fromExpression = evaluation.expression.from = new FromExpression(source.expression)
     var atomicExpression = new AtomicExpression(fromExpression)
     var scalar = createScalar<S>(atomicExpression, source.schema)
     return scalar
 }
 
-export function join<S>(source: SqlSet<S>): { on: (condition: (s: Scalar<S>) => Predicate) => Scalar<S> } {
+export function join<S>(source: SqlSetLike<S>): { on: (condition: (s: Scalar<S>) => Predicate) => Scalar<S> } {
     return {
-        on: (condition: (s: Scalar<S>) => Predicate) => {
-            if (!(source instanceof ConcreteSqlSet)) source = asSet(source)
-
-            var evaluation = getCurrentEvaluation();
-            
-            var joinExpression = new JoinExpression(source.expression)
-            joinExpression.kind = 'JOIN'
-            var atomicExpression = new AtomicExpression(joinExpression)
-            var scalar = createScalar<S>(atomicExpression, source.schema)
-            joinExpression.on = condition(scalar).expression
-        
-            evaluation.expression.joins.push(joinExpression)
-        
-            return scalar
-        }
+        on: (condition: (s: Scalar<S>) => Predicate) => joinImpl(source, condition)
     }
+}
+
+function joinImpl<S>(source: SqlSetLike<S>, condition?: (s: Scalar<S>) => Predicate): Scalar<S> {
+    if (!(source instanceof ConcreteSqlSet)) source = asSet(source)
+        
+    var evaluation = getCurrentEvaluation();
+    
+    var joinExpression = new JoinExpression(source.expression)
+    joinExpression.kind = condition ? 'JOIN' : 'CROSS JOIN'
+    var atomicExpression = new AtomicExpression(joinExpression)
+    var scalar = createScalar<S>(atomicExpression, source.schema)
+    joinExpression.on = condition ? condition(scalar).expression : undefined
+
+    evaluation.expression.joins.push(joinExpression)
+
+    return scalar            
 }
 
 function hasCtor(o: any) {
@@ -173,6 +181,14 @@ export var query: {
     }
 }
 
-export function asSet<E>(s: Scalar<E[]>): ConcreteSqlSet<E> {
-    return s as any as ConcreteSqlSet<E>
+export function asSet<E>(s: SqlSetLike<E>): ConcreteSqlSet<E> {
+    if (s instanceof ConcreteSqlSet)
+        return s as any as ConcreteSqlSet<E>
+    else if (s instanceof ColumnScalar) {
+        console.info("making set from scalar")
+        console.info(s.toString())
+        return new ConcreteSqlSet(new ScalarAsSetExpression(s.expression), (s as any).elementConstructor)
+    }
+    else
+        throw "Unexpected argument of a from or join function: " + s
 }

@@ -19,6 +19,10 @@ export class ImmediateSetExpression extends SetExpression {
     values: any[]
 }
 
+export class ScalarAsSetExpression extends SetExpression {
+    constructor(public element: ScalarExpression) { super() }
+}
+
 // query/subquery
 export class SelectExpression {
     from: FromExpression
@@ -47,7 +51,7 @@ export class FromExpression extends BindingExpression {
 
 export class JoinExpression extends BindingExpression {
     kind: string
-    on: PredicateExpression
+    on?: PredicateExpression
 }
 
 // Functions: FUN '(' [MODIFIERS] PARAMS ')' [ 'WITHIN GROUP' ( 'ORDER BY' ... ) ] [ 'OVER' ( [PARTITION], [ORDER], [ROWSRANGE] ) ]
@@ -191,7 +195,7 @@ class ExpressionVisitor {
     }
     visitJoinExpression(expression: JoinExpression) {
         this.visitSetExpression(expression.source)
-        this.visitPredicateExpression(expression.on)
+        if (expression.on) this.visitPredicateExpression(expression.on)
     }
 
     visitScalarExpression(expression: ScalarExpression) {
@@ -407,10 +411,13 @@ class SerializerVisitor extends ExpressionVisitor {
             var identifier = this.identifiers ? this.identifiers.get(expression) : undefined
             this.write(identifier ? identifier : '*')
         })
-        this.run(() => {
-            this.write('ON')
-            this.visitPredicateExpression(expression.on)
-        })
+        if (expression.on) {
+            let expressionOn = expression.on
+            this.run(() => {
+                this.write('ON')
+                this.visitPredicateExpression(expressionOn)
+            })
+        }
     }
 
     visitQueriedExpression(expression: QueriedSetExpression) {

@@ -82,6 +82,13 @@ exports.NamedSetExpression = NamedSetExpression;
 class ImmediateSetExpression extends SetExpression {
 }
 exports.ImmediateSetExpression = ImmediateSetExpression;
+class ScalarAsSetExpression extends SetExpression {
+    constructor(element) {
+        super();
+        this.element = element;
+    }
+}
+exports.ScalarAsSetExpression = ScalarAsSetExpression;
 class SelectExpression {
     constructor() {
         this.joins = [];
@@ -223,7 +230,8 @@ class ExpressionVisitor {
     }
     visitJoinExpression(expression) {
         this.visitSetExpression(expression.source);
-        this.visitPredicateExpression(expression.on);
+        if (expression.on)
+            this.visitPredicateExpression(expression.on);
     }
     visitScalarExpression(expression) {
         if (expression instanceof ScalarSubqueryExpression)
@@ -418,10 +426,13 @@ class SerializerVisitor extends ExpressionVisitor {
             var identifier = this.identifiers ? this.identifiers.get(expression) : undefined;
             this.write(identifier ? identifier : '*');
         });
-        this.run(() => {
-            this.write('ON');
-            this.visitPredicateExpression(expression.on);
-        });
+        if (expression.on) {
+            let expressionOn = expression.on;
+            this.run(() => {
+                this.write('ON');
+                this.visitPredicateExpression(expressionOn);
+            });
+        }
     }
     visitQueriedExpression(expression) {
         this.write('(');
@@ -554,10 +565,15 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const expression_1 = __webpack_require__(0);
 const fluent_1 = __webpack_require__(3);
 __webpack_require__(5);
+function toMany(ctor) {
+    var result = [];
+    result.elementConstructor = ctor;
+    return result;
+}
 class Order {
     constructor() {
         this.orderNo = '';
-        this.invoices = [];
+        this.invoices = toMany(Invoice);
     }
 }
 class Invoice {
@@ -569,13 +585,23 @@ class Invoice {
 }
 var invoices = fluent_1.defineTable("invoices", new Invoice());
 var orders = fluent_1.defineTable("orders", new Order());
-var temp = () => {
+function processQuery(set) {
+    console.info(expression_1.sqlify(set.expression));
+}
+processQuery(fluent_1.query(() => {
     var o = fluent_1.from(orders);
     var i = fluent_1.join(invoices).on(i => o.orderNo.eq(i.orderNo));
     return { ono: o.orderNo, ino: i.invoiceNo, extra: i.order.orderNo };
-};
-var myQuery = fluent_1.query(temp);
-console.info(expression_1.sqlify(myQuery.expression));
+}));
+processQuery(fluent_1.query(() => {
+    var o = fluent_1.from(orders);
+    var i = fluent_1.from(o.invoices);
+    console.info("ctor next");
+    console.info(o.invoices.elementConstructor);
+    console.info(i.expression);
+    console.info(i.invoiceNo);
+    return { ono: o.orderNo, ino: i.invoiceNo };
+}));
 
 
 /***/ }),
@@ -587,17 +613,30 @@ console.info(expression_1.sqlify(myQuery.expression));
 Object.defineProperty(exports, "__esModule", { value: true });
 const proxy_1 = __webpack_require__(4);
 const expression_1 = __webpack_require__(0);
-function getProxySchemaForObject(expression, target) {
-    return {
-        properties: Object.keys(target),
-        proxyPrototype: ColumnScalar.prototype,
-        process(proxy) {
-            proxy.expression = expression;
-        },
-        getPropertySchema(name) {
-            return getProxySchemaForObject(new expression_1.MemberExpression(expression, name), target[name]);
-        }
+function getSetSchema() {
+    var result = new proxy_1.ProxySchema();
+    result.target = {};
+    result.proxyPrototype = ColumnScalar.prototype;
+    result.process = (proxy) => {
     };
+    result.getPropertySchema = undefined;
+    return result;
+}
+function getProxySchemaForObject(expression, target) {
+    var result = new proxy_1.ProxySchema();
+    result.target = target,
+        result.proxyPrototype = ColumnScalar.prototype,
+        result.process = (proxy) => {
+            proxy.expression = expression;
+        };
+    result.getPropertySchema = (name) => {
+        var ntarget = target[name];
+        if (Array.isArray(ntarget))
+            return getSetSchema();
+        else
+            return getProxySchemaForObject(new expression_1.MemberExpression(expression, name), target[name]);
+    };
+    return result;
 }
 function createScalar(expression, target) {
     var scalar = proxy_1.createProxy(getProxySchemaForObject(expression, target));
@@ -635,11 +674,12 @@ function defineTable(name, schema) {
 }
 exports.defineTable = defineTable;
 function immediate(value) { throw null; }
-var scalar = (e) => e;
 function from(source) {
     if (!(source instanceof ConcreteSqlSet))
         source = asSet(source);
     var evaluation = getCurrentEvaluation();
+    if (evaluation.expression.from)
+        return joinImpl(source);
     var fromExpression = evaluation.expression.from = new expression_1.FromExpression(source.expression);
     var atomicExpression = new expression_1.AtomicExpression(fromExpression);
     var scalar = createScalar(atomicExpression, source.schema);
@@ -648,21 +688,22 @@ function from(source) {
 exports.from = from;
 function join(source) {
     return {
-        on: (condition) => {
-            if (!(source instanceof ConcreteSqlSet))
-                source = asSet(source);
-            var evaluation = getCurrentEvaluation();
-            var joinExpression = new expression_1.JoinExpression(source.expression);
-            joinExpression.kind = 'JOIN';
-            var atomicExpression = new expression_1.AtomicExpression(joinExpression);
-            var scalar = createScalar(atomicExpression, source.schema);
-            joinExpression.on = condition(scalar).expression;
-            evaluation.expression.joins.push(joinExpression);
-            return scalar;
-        }
+        on: (condition) => joinImpl(source, condition)
     };
 }
 exports.join = join;
+function joinImpl(source, condition) {
+    if (!(source instanceof ConcreteSqlSet))
+        source = asSet(source);
+    var evaluation = getCurrentEvaluation();
+    var joinExpression = new expression_1.JoinExpression(source.expression);
+    joinExpression.kind = condition ? 'JOIN' : 'CROSS JOIN';
+    var atomicExpression = new expression_1.AtomicExpression(joinExpression);
+    var scalar = createScalar(atomicExpression, source.schema);
+    joinExpression.on = condition ? condition(scalar).expression : undefined;
+    evaluation.expression.joins.push(joinExpression);
+    return scalar;
+}
 function hasCtor(o) {
     return o.__proto__ && o.__proto__.constructor !== Object;
 }
@@ -704,7 +745,15 @@ exports.query = (monad) => {
     }
 };
 function asSet(s) {
-    return s;
+    if (s instanceof ConcreteSqlSet)
+        return s;
+    else if (s instanceof ColumnScalar) {
+        console.info("making set from scalar");
+        console.info(s.toString());
+        return new ConcreteSqlSet(new expression_1.ScalarAsSetExpression(s.expression), s.elementConstructor);
+    }
+    else
+        throw "Unexpected argument of a from or join function: " + s;
 }
 exports.asSet = asSet;
 
@@ -716,22 +765,24 @@ exports.asSet = asSet;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
-function getTrivialProxySchema(proxyPrototype) {
-    return {
-        properties: [],
-        proxyPrototype: proxyPrototype,
-        process(proxy) { },
-        getPropertySchema(name) { throw "Internal error: Trivial schema has no properties."; }
-    };
+class ProxySchema {
 }
-exports.getTrivialProxySchema = getTrivialProxySchema;
+exports.ProxySchema = ProxySchema;
 function createProxy(schema) {
     var proxy = Object.create(schema.proxyPrototype);
     schema.process(proxy);
-    for (var prop of schema.properties) {
-        let propCopy = prop;
-        var getter = function () { return createProxy(schema.getPropertySchema(propCopy)); };
-        Object.defineProperty(proxy, prop, { get: getter });
+    if (schema.target) {
+        for (var prop in schema.target) {
+            let propCopy = prop;
+            if (schema.getPropertySchema) {
+                let getPropertySchema = schema.getPropertySchema;
+                var getter = function () { return createProxy(getPropertySchema(propCopy)); };
+                Object.defineProperty(proxy, prop, { get: getter });
+            }
+            else {
+                proxy[prop] = schema.target[prop];
+            }
+        }
     }
     return proxy;
 }
