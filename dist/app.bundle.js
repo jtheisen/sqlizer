@@ -553,18 +553,18 @@ module.exports = __webpack_require__(2);
 Object.defineProperty(exports, "__esModule", { value: true });
 const expression_1 = __webpack_require__(0);
 const fluent_1 = __webpack_require__(3);
-const entities_1 = __webpack_require__(5);
-__webpack_require__(6);
+__webpack_require__(5);
 class Order {
     constructor() {
-        this.orderNo = entities_1.defString();
+        this.orderNo = '';
+        this.invoices = [];
     }
 }
 class Invoice {
     constructor() {
-        this.invoiceNo = entities_1.defString();
-        this.orderNo = entities_1.defString();
-        this.order = entities_1.defReference(Order);
+        this.invoiceNo = '';
+        this.orderNo = '';
+        this.order = new Order();
     }
 }
 var invoices = fluent_1.defineTable("invoices", new Invoice());
@@ -740,73 +740,6 @@ exports.createProxy = createProxy;
 
 /***/ }),
 /* 5 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-class ProbeMock {
-    constructor(count, type) {
-        this.count = count;
-        this.type = type;
-    }
-}
-var entities = {};
-function Table(constructor) {
-}
-exports.Table = Table;
-var areProbing = false;
-var stack = [];
-function getStackTop() { return stack[stack.length - 1]; }
-function defString() {
-    if (!areProbing)
-        return '';
-    var top = getStackTop();
-    return new ProbeMock(top.currentPropertyIndex++, 'string');
-}
-exports.defString = defString;
-function defReference(constructor) {
-    if (!areProbing)
-        return new constructor();
-    var top = getStackTop();
-    return new ProbeMock(top.currentPropertyIndex++, entities[constructor.name]);
-}
-exports.defReference = defReference;
-function getSchemaPrototypeForEntity(name) {
-    return entities[name].schemaPrototype;
-}
-function scanEntity(constructor) {
-    var schemaPrototype = Object.create(null);
-    var entity = { constructor, properties: [], schemaPrototype };
-    stack.push({ entity, currentPropertyIndex: 0 });
-    areProbing = true;
-    try {
-        var mock = new constructor();
-        var properties = [];
-        for (var prop in mock) {
-            var value = mock[prop];
-            if (value instanceof ProbeMock) {
-                properties[value.count] = { name: prop, type: value.type };
-                if (value.type === 'string' || value.type === 'number') {
-                    schemaPrototype[prop] = null;
-                }
-                else {
-                    var name = value.type.constructor.name;
-                    Object.defineProperty(schemaPrototype, prop, { get: function () { return getSchemaPrototypeForEntity(name); } });
-                }
-            }
-        }
-        entities[constructor.name] = entity;
-    }
-    finally {
-        areProbing = false;
-        stack.pop();
-    }
-}
-
-
-/***/ }),
-/* 6 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(process, global) {/*! *****************************************************************************
@@ -1934,10 +1867,10 @@ var Reflect;
             Function("return this;")());
 })(Reflect || (Reflect = {}));
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(7), __webpack_require__(8)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(6), __webpack_require__(7)))
 
 /***/ }),
-/* 7 */
+/* 6 */
 /***/ (function(module, exports) {
 
 // shim for using process in browser
@@ -2127,7 +2060,7 @@ process.umask = function() { return 0; };
 
 
 /***/ }),
-/* 8 */
+/* 7 */
 /***/ (function(module, exports) {
 
 var g;

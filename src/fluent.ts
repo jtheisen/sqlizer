@@ -1,5 +1,5 @@
 import { createProxy, getTrivialProxySchema, ProxySchema } from './proxy';
-import { EntityDescriptor } from './entities';
+//import { EntityDescriptor } from './entities';
 import {
     AtomicExpression,
     BindingExpression,

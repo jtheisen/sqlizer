@@ -1,6 +1,6 @@
 import { MemberExpression, ScalarExpression, sqlify } from './expression';
 import { asSet, defineTable, from, join, query, Scalar, SqlSet } from './fluent';
-import { defReference, defString, Table } from './entities';
+//import { defReference, defString, Table } from './entities';
 import * as tape from 'tape';
 import 'reflect-metadata';
 
@@ -27,17 +27,17 @@ It does not yet, however, contain the following:
 
 //@Table
 class Order {
-    orderNo = defString()
+    orderNo = ''
     
-    //invoices = def
+    invoices: Invoice[] = []
 }
 
 //@Table
 class Invoice {
-    invoiceNo = defString()
-    orderNo = defString()
+    invoiceNo = ''
+    orderNo = ''
 
-    order = defReference(Order)
+    order = new Order()
 }
 
 var invoices = defineTable("invoices", new Invoice());
