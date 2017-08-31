@@ -564,6 +564,14 @@ const expression_1 = __webpack_require__(0);
 const fluent_1 = __webpack_require__(3);
 const entities_1 = __webpack_require__(5);
 __webpack_require__(6);
+let Order = class Order {
+    constructor() {
+        this.orderNo = entities_1.defString();
+    }
+};
+Order = __decorate([
+    entities_1.Table
+], Order);
 let Invoice = class Invoice {
     constructor() {
         this.invoiceNo = entities_1.defString();
@@ -574,20 +582,12 @@ let Invoice = class Invoice {
 Invoice = __decorate([
     entities_1.Table
 ], Invoice);
-let Order = class Order {
-    constructor() {
-        this.orderNo = entities_1.defString();
-    }
-};
-Order = __decorate([
-    entities_1.Table
-], Order);
 var invoices = fluent_1.defineTable("invoices", new Invoice());
 var orders = fluent_1.defineTable("orders", new Order());
 var temp = () => {
     var o = fluent_1.from(orders);
     var i = fluent_1.join(invoices).on(i => o.orderNo.eq(i.orderNo));
-    return { o, i };
+    return { ono: o.orderNo, ino: i.invoiceNo };
 };
 var myQuery = fluent_1.query(temp);
 console.info(expression_1.sqlify(myQuery.expression));
@@ -669,7 +669,7 @@ function join(source) {
                 source = asSet(source);
             var evaluation = getCurrentEvaluation();
             var joinExpression = new expression_1.JoinExpression(source.expression);
-            joinExpression.kind = 'join';
+            joinExpression.kind = 'JOIN';
             var atomicExpression = new expression_1.AtomicExpression(joinExpression);
             var scalar = createScalar(atomicExpression, source.schema);
             joinExpression.on = condition(scalar).expression;

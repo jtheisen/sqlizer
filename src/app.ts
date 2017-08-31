@@ -25,6 +25,12 @@ It does not yet, however, contain the following:
 
 //var x: PropertyDescriptor
 
+@Table
+class Order {
+    orderNo = defString()
+    
+    //invoices = def
+}
 
 @Table
 class Invoice {
@@ -32,13 +38,6 @@ class Invoice {
     orderNo = defString()
 
     order = defReference(Order)
-}
-
-@Table
-class Order {
-    orderNo = defString()
-    
-    //invoices = def
 }
 
 var invoices = defineTable("invoices", new Invoice());
@@ -51,7 +50,7 @@ var temp = () => {
     var o = from(orders);
     var i = join(invoices).on(i => o.orderNo.eq(i.orderNo));
 
-    return { o, i };
+    return { ono: o.orderNo, ino: i.invoiceNo };
 }
 
 var myQuery = query(temp)

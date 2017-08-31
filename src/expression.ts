@@ -381,7 +381,6 @@ class SerializerVisitor extends ExpressionVisitor {
     visitSelectExpression(expression: SelectExpression) {
         this.run(() => {
             this.write('SELECT')
-            console.info("visiting scalar expression in select " + (expression.select as any).__proto__.constructor.name)
             this.visitScalarExpression(expression.select)
         })
         
@@ -455,7 +454,6 @@ class SerializerVisitor extends ExpressionVisitor {
     // Scalars
 
     visitAtomicExpression(expression: AtomicExpression) {
-        console.info("visiting atomic expression")
         var identifier = this.identifiers.get(expression.binding)
         if (!identifier) throw "Unexpectedly missing identifier."
         this.write(identifier)
@@ -489,7 +487,6 @@ class SerializerVisitor extends ExpressionVisitor {
         for (var key of expression.keys) {
             if (hadFirst) this.write(',')
             hadFirst = true
-            console.info((expression.keys.length as any).__proto__.constructor.name)
             this.write(key)
             this.write(':')
             this.visitScalarExpression(expression.map[key])

@@ -109,7 +109,7 @@ export function join<S>(source: SqlSet<S>): { on: (condition: (s: Scalar<S>) => 
             var evaluation = getCurrentEvaluation();
             
             var joinExpression = new JoinExpression(source.expression)
-            joinExpression.kind = 'join'
+            joinExpression.kind = 'JOIN'
             var atomicExpression = new AtomicExpression(joinExpression)
             var scalar = createScalar<S>(atomicExpression, source.schema)
             joinExpression.on = condition(scalar).expression
