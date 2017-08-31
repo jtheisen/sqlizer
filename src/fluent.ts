@@ -25,19 +25,21 @@ import {
 //
 
 
-function getProxySchemaForObject(target: any) {
+function getProxySchemaForObject(expression: ScalarExpression, target: any) {
     return {
         properties: Object.keys(target),
         proxyPrototype: ColumnScalar.prototype,
+        process(proxy: any) {
+            proxy.expression = expression
+        },
         getPropertySchema(name: string) {
-            return getProxySchemaForObject(target[name])
+            return getProxySchemaForObject(new MemberExpression(expression, name), target[name])
         }
     }
 }
 
 function createScalar<T>(expression: AtomicExpression, target: any): Scalar<T> {
-    var scalar = createProxy(getProxySchemaForObject(target))
-    scalar.expression = expression
+    var scalar = createProxy(getProxySchemaForObject(expression, target))
     return scalar
 }
 

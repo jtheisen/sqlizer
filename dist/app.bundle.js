@@ -585,6 +585,9 @@ var myEntities = fluent_1.defineTable("myEntities", new Entity());
 var myCities = fluent_1.defineTable("myCities", new City());
 var temp = () => {
     var x = fluent_1.from(myEntities);
+    console.info(x.expression);
+    console.info(x.name.expression);
+    console.info(x.name.expression.parent.binding.source.name);
     return { age: x.age, name: x.name };
 };
 var myQuery = fluent_1.query(temp);
@@ -600,29 +603,21 @@ console.info(expression_1.sqlify(myQuery.expression));
 Object.defineProperty(exports, "__esModule", { value: true });
 const proxy_1 = __webpack_require__(4);
 const expression_1 = __webpack_require__(0);
-function getProxySchemaForObject(target) {
+function getProxySchemaForObject(expression, target) {
     return {
         properties: Object.keys(target),
         proxyPrototype: ColumnScalar.prototype,
+        process(proxy) {
+            proxy.expression = expression;
+        },
         getPropertySchema(name) {
-            return getProxySchemaForObject(target[name]);
+            return getProxySchemaForObject(new expression_1.MemberExpression(expression, name), target[name]);
         }
     };
 }
-function createScalar(expression, target, makeColumnar = false) {
-    if (makeColumnar)
-        target = getColumnar(expression, target);
-    var scalar = proxy_1.createProxy(getProxySchemaForObject(target));
-    scalar.expression = expression;
+function createScalar(expression, target) {
+    var scalar = proxy_1.createProxy(getProxySchemaForObject(expression, target));
     return scalar;
-}
-function getColumnar(expression, target) {
-    var result = {};
-    for (var key in target) {
-        let scalar = result[key] = new ColumnScalar();
-        scalar.expression = expression;
-    }
-    return result;
 }
 class ColumnScalar {
     eq(rhs) { return new Predicate(new expression_1.ComparisonExpression('=', this.expression, rhs.expression)); }
@@ -664,7 +659,7 @@ function from(source) {
     var evaluation = getCurrentEvaluation();
     var fromExpression = evaluation.expression.from = new expression_1.FromExpression(source.expression);
     var atomicExpression = new expression_1.AtomicExpression(fromExpression);
-    var scalar = createScalar(atomicExpression, source.schema, source.isColumnar);
+    var scalar = createScalar(atomicExpression, source.schema);
     return scalar;
 }
 exports.from = from;
@@ -677,7 +672,7 @@ function join(source) {
             var joinExpression = new expression_1.JoinExpression(source.expression);
             joinExpression.kind = 'join';
             var atomicExpression = new expression_1.AtomicExpression(joinExpression);
-            var scalar = createScalar(atomicExpression, source.schema, source.isColumnar);
+            var scalar = createScalar(atomicExpression, source.schema);
             joinExpression.on = condition(scalar).expression;
             evaluation.expression.joins.push(joinExpression);
             return scalar;
@@ -742,15 +737,17 @@ function getTrivialProxySchema(proxyPrototype) {
     return {
         properties: [],
         proxyPrototype: proxyPrototype,
+        process(proxy) { },
         getPropertySchema(name) { throw "Internal error: Trivial schema has no properties."; }
     };
 }
 exports.getTrivialProxySchema = getTrivialProxySchema;
 function createProxy(schema) {
-    var x;
     var proxy = Object.create(schema.proxyPrototype);
+    schema.process(proxy);
     for (var prop of schema.properties) {
-        var getter = function () { return createProxy(schema.getPropertySchema(prop)); };
+        let propCopy = prop;
+        var getter = function () { return createProxy(schema.getPropertySchema(propCopy)); };
         Object.defineProperty(proxy, prop, { get: getter });
     }
     return proxy;

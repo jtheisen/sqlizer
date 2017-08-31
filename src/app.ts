@@ -45,6 +45,12 @@ var myCities = defineTable("myCities", new City());
 
 var temp = () => {
     var x = from(myEntities);
+
+    console.info((x as any).expression)
+    console.info((x.name as any).expression)
+    
+    console.info((x.name as any).expression.parent.binding.source.name)
+
     //var y = join(myCities).on(c => x.name.eq(c.name).and(x.isIn(y.entities)));
     //var z = join(y.entities);
 
