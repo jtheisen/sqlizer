@@ -394,7 +394,6 @@ class SerializerVisitor extends ExpressionVisitor {
     visitSelectExpression(expression) {
         this.run(() => {
             this.write('SELECT');
-            console.info("visiting scalar expression in select " + expression.select.__proto__.constructor.name);
             this.visitScalarExpression(expression.select);
         });
         this.run(() => {
@@ -460,7 +459,6 @@ class SerializerVisitor extends ExpressionVisitor {
         this.visitSetExpression(expression.operand);
     }
     visitAtomicExpression(expression) {
-        console.info("visiting atomic expression");
         var identifier = this.identifiers.get(expression.binding);
         if (!identifier)
             throw "Unexpectedly missing identifier.";
@@ -497,7 +495,6 @@ class SerializerVisitor extends ExpressionVisitor {
             if (hadFirst)
                 this.write(',');
             hadFirst = true;
-            console.info(expression.keys.length.__proto__.constructor.name);
             this.write(key);
             this.write(':');
             this.visitScalarExpression(expression.map[key]);
@@ -636,10 +633,9 @@ class Predicate {
 }
 var SqlTrue;
 class ConcreteSqlSet {
-    constructor(expression, schema, isColumnar = false) {
+    constructor(expression, schema) {
         this.expression = expression;
         this.schema = schema;
-        this.isColumnar = isColumnar;
     }
     any() { return new Predicate(new expression_1.ExistsExpression(this.expression)); }
 }
@@ -647,7 +643,7 @@ exports.ConcreteSqlSet = ConcreteSqlSet;
 function defineTable(name, schema) {
     var expression = new expression_1.NamedSetExpression();
     expression.name = name;
-    return new ConcreteSqlSet(expression, schema, true);
+    return new ConcreteSqlSet(expression, schema);
 }
 exports.defineTable = defineTable;
 function immediate(value) { throw null; }

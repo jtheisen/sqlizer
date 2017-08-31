@@ -71,7 +71,7 @@ class Predicate {
 var SqlTrue: Predicate;
 
 export class ConcreteSqlSet<E> {
-    constructor(public expression: SetExpression, public schema: any, public isColumnar: boolean = false) { }
+    constructor(public expression: SetExpression, public schema: any) { }
 
     any(): Predicate { return new Predicate(new ExistsExpression(this.expression)) }
 }
@@ -81,7 +81,7 @@ export type SqlSet<E> = ConcreteSqlSet<E> // | Scalar<E[]>
 export function defineTable<E>(name: string, schema: E): ConcreteSqlSet<{ [P in keyof E]: ColumnScalar<E[P]> }> {
     var expression = new NamedSetExpression()
     expression.name = name
-    return new ConcreteSqlSet(expression, schema, true)
+    return new ConcreteSqlSet(expression, schema)
 }
 
 function immediate<T>(value: T): Scalar<T> { throw null; }
