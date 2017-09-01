@@ -206,10 +206,13 @@ class ExpressionVisitor {
             this.visitJoinExpression(join);
     }
     visitSetExpression(expression) {
+        console.info("visiting set expression " + expression.__proto__.constructor.name);
         if (expression instanceof NamedSetExpression)
             this.visitNamedExpression(expression);
         else if (expression instanceof QueriedSetExpression)
             this.visitQueriedExpression(expression);
+        else if (expression instanceof ScalarAsSetExpression)
+            this.visitScalarAsSetExpression(expression);
         else
             this.unconsidered();
     }
@@ -217,6 +220,10 @@ class ExpressionVisitor {
         this.visitSelectExpression(expression.definition);
     }
     visitNamedExpression(expression) { }
+    visitScalarAsSetExpression(expression) {
+        console.info("visiting set expression " + expression.element);
+        this.visitScalarExpression(expression.element);
+    }
     visitBindingExpression(expression) {
         if (expression instanceof FromExpression)
             this.visitFromExpression(expression);
@@ -358,7 +365,7 @@ function createIdentifiers(bindings) {
             return 'subquery';
         }
         else {
-            return 'unknown';
+            return 'set';
         }
     }
     var identifiersNeedingQualification = new Map();
@@ -593,6 +600,7 @@ processQuery(fluent_1.query(() => {
     var i = fluent_1.join(invoices).on(i => o.orderNo.eq(i.orderNo));
     return { ono: o.orderNo, ino: i.invoiceNo, extra: i.order.orderNo };
 }));
+var order = new Order();
 processQuery(fluent_1.query(() => {
     var o = fluent_1.from(orders);
     var i = fluent_1.from(o.invoices);
@@ -613,9 +621,9 @@ processQuery(fluent_1.query(() => {
 Object.defineProperty(exports, "__esModule", { value: true });
 const proxy_1 = __webpack_require__(4);
 const expression_1 = __webpack_require__(0);
-function getSetSchema() {
+function getProxySchemaForArray(elementConstructor, expression) {
     var result = new proxy_1.ProxySchema();
-    result.target = {};
+    result.target = { elementConstructor, expression };
     result.proxyPrototype = ColumnScalar.prototype;
     result.process = (proxy) => {
     };
@@ -631,8 +639,12 @@ function getProxySchemaForObject(expression, target) {
         };
     result.getPropertySchema = (name) => {
         var ntarget = target[name];
-        if (Array.isArray(ntarget))
-            return getSetSchema();
+        if (Array.isArray(ntarget)) {
+            var elementConstructor = ntarget.elementConstructor;
+            if (!elementConstructor)
+                throw "Array property without element constructor encountered.";
+            return getProxySchemaForArray(elementConstructor, new expression_1.MemberExpression(expression, name));
+        }
         else
             return getProxySchemaForObject(new expression_1.MemberExpression(expression, name), target[name]);
     };
@@ -682,7 +694,12 @@ function from(source) {
         return joinImpl(source);
     var fromExpression = evaluation.expression.from = new expression_1.FromExpression(source.expression);
     var atomicExpression = new expression_1.AtomicExpression(fromExpression);
+    console.info("creating scalar with schema ");
+    console.info(source.schema);
     var scalar = createScalar(atomicExpression, source.schema);
+    console.info("got");
+    console.info(scalar.orderNo);
+    console.info(scalar.invoices);
     return scalar;
 }
 exports.from = from;
@@ -749,8 +766,8 @@ function asSet(s) {
         return s;
     else if (s instanceof ColumnScalar) {
         console.info("making set from scalar");
-        console.info(s.toString());
-        return new ConcreteSqlSet(new expression_1.ScalarAsSetExpression(s.expression), s.elementConstructor);
+        console.info(s);
+        return new ConcreteSqlSet(new expression_1.ScalarAsSetExpression(s.expression), new s.elementConstructor());
     }
     else
         throw "Unexpected argument of a from or join function: " + s;

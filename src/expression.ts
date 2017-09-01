@@ -169,10 +169,13 @@ class ExpressionVisitor {
             this.visitJoinExpression(join)
     }
     visitSetExpression(expression: SetExpression) {
+        console.info("visiting set expression " + (expression as any).__proto__.constructor.name)
         if (expression instanceof NamedSetExpression)
             this.visitNamedExpression(expression)
         else if (expression instanceof QueriedSetExpression)
             this.visitQueriedExpression(expression)
+        else if (expression instanceof ScalarAsSetExpression)
+            this.visitScalarAsSetExpression(expression)
         else
             this.unconsidered()
     }
@@ -181,6 +184,10 @@ class ExpressionVisitor {
     }
     visitNamedExpression(expression: NamedSetExpression) { }
     //visitImmediateExpression(expression: ImmediateSetExpression) { this.unconsidered() }
+    visitScalarAsSetExpression(expression: ScalarAsSetExpression) {
+        console.info("visiting set expression " + (expression.element as any))
+        this.visitScalarExpression(expression.element)
+    }
 
     visitBindingExpression(expression: BindingExpression) {
         if (expression instanceof FromExpression)
@@ -332,7 +339,7 @@ function createIdentifiers(bindings: BindingExpression[]) {
         } else if(setExpression instanceof QueriedSetExpression) {
             return 'subquery'
         } else {
-            return 'unknown'
+            return 'set'
         }
     }
 

@@ -62,6 +62,8 @@ processQuery(query(() => {
     return { ono: o.orderNo, ino: i.invoiceNo, extra: i.order.orderNo };
 }))
 
+var order = new Order()
+
 processQuery(query(() => {
     var o = from(orders);
     var i = from(o.invoices)

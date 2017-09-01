@@ -19,9 +19,9 @@ import {
     SetExpression,
 } from './expression';
 
-function getSetSchema(): ProxySchema {
+function getProxySchemaForArray(elementConstructor: any, expression: any): ProxySchema {
     var result = new ProxySchema()
-    result.target = { }
+    result.target = { elementConstructor, expression }
     result.proxyPrototype = ColumnScalar.prototype
     result.process = (proxy: any) => {
     }
@@ -38,12 +38,15 @@ function getProxySchemaForObject(expression: ScalarExpression, target: any): Pro
     }
     result.getPropertySchema = (name: string): ProxySchema => {
         var ntarget = target[name]
-        if (Array.isArray(ntarget))
-            return getSetSchema()
+        if (Array.isArray(ntarget)) {
+            var elementConstructor = (ntarget as any).elementConstructor
+            if (!elementConstructor) throw "Array property without element constructor encountered."
+            return getProxySchemaForArray(elementConstructor, new MemberExpression(expression, name))
+        }
         else
             return getProxySchemaForObject(new MemberExpression(expression, name), target[name])
     }
-        
+
     return result
 }
 
@@ -103,7 +106,12 @@ export function from<S>(source: SqlSetLike<S>): Scalar<S> {
     if (evaluation.expression.from) return joinImpl(source)
     var fromExpression = evaluation.expression.from = new FromExpression(source.expression)
     var atomicExpression = new AtomicExpression(fromExpression)
+    console.info("creating scalar with schema ")
+    console.info(source.schema)
     var scalar = createScalar<S>(atomicExpression, source.schema)
+    console.info("got")
+    console.info((scalar as any).orderNo)
+    console.info((scalar as any).invoices)
     return scalar
 }
 
@@ -186,8 +194,8 @@ export function asSet<E>(s: SqlSetLike<E>): ConcreteSqlSet<E> {
         return s as any as ConcreteSqlSet<E>
     else if (s instanceof ColumnScalar) {
         console.info("making set from scalar")
-        console.info(s.toString())
-        return new ConcreteSqlSet(new ScalarAsSetExpression(s.expression), (s as any).elementConstructor)
+        console.info(s)
+        return new ConcreteSqlSet(new ScalarAsSetExpression(s.expression), new (s as any).elementConstructor())
     }
     else
         throw "Unexpected argument of a from or join function: " + s
