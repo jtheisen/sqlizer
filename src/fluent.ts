@@ -106,12 +106,7 @@ export function from<S>(source: SqlSetLike<S>): Scalar<S> {
     if (evaluation.expression.from) return joinImpl(source)
     var fromExpression = evaluation.expression.from = new FromExpression(source.expression)
     var atomicExpression = new AtomicExpression(fromExpression)
-    console.info("creating scalar with schema ")
-    console.info(source.schema)
     var scalar = createScalar<S>(atomicExpression, source.schema)
-    console.info("got")
-    console.info((scalar as any).orderNo)
-    console.info((scalar as any).invoices)
     return scalar
 }
 
@@ -193,8 +188,6 @@ export function asSet<E>(s: SqlSetLike<E>): ConcreteSqlSet<E> {
     if (s instanceof ConcreteSqlSet)
         return s as any as ConcreteSqlSet<E>
     else if (s instanceof ColumnScalar) {
-        console.info("making set from scalar")
-        console.info(s)
         return new ConcreteSqlSet(new ScalarAsSetExpression(s.expression), new (s as any).elementConstructor())
     }
     else

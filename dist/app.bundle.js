@@ -206,7 +206,6 @@ class ExpressionVisitor {
             this.visitJoinExpression(join);
     }
     visitSetExpression(expression) {
-        console.info("visiting set expression " + expression.__proto__.constructor.name);
         if (expression instanceof NamedSetExpression)
             this.visitNamedExpression(expression);
         else if (expression instanceof QueriedSetExpression)
@@ -221,7 +220,6 @@ class ExpressionVisitor {
     }
     visitNamedExpression(expression) { }
     visitScalarAsSetExpression(expression) {
-        console.info("visiting set expression " + expression.element);
         this.visitScalarExpression(expression.element);
     }
     visitBindingExpression(expression) {
@@ -600,14 +598,9 @@ processQuery(fluent_1.query(() => {
     var i = fluent_1.join(invoices).on(i => o.orderNo.eq(i.orderNo));
     return { ono: o.orderNo, ino: i.invoiceNo, extra: i.order.orderNo };
 }));
-var order = new Order();
 processQuery(fluent_1.query(() => {
     var o = fluent_1.from(orders);
     var i = fluent_1.from(o.invoices);
-    console.info("ctor next");
-    console.info(o.invoices.elementConstructor);
-    console.info(i.expression);
-    console.info(i.invoiceNo);
     return { ono: o.orderNo, ino: i.invoiceNo };
 }));
 
@@ -694,12 +687,7 @@ function from(source) {
         return joinImpl(source);
     var fromExpression = evaluation.expression.from = new expression_1.FromExpression(source.expression);
     var atomicExpression = new expression_1.AtomicExpression(fromExpression);
-    console.info("creating scalar with schema ");
-    console.info(source.schema);
     var scalar = createScalar(atomicExpression, source.schema);
-    console.info("got");
-    console.info(scalar.orderNo);
-    console.info(scalar.invoices);
     return scalar;
 }
 exports.from = from;
@@ -765,8 +753,6 @@ function asSet(s) {
     if (s instanceof ConcreteSqlSet)
         return s;
     else if (s instanceof ColumnScalar) {
-        console.info("making set from scalar");
-        console.info(s);
         return new ConcreteSqlSet(new expression_1.ScalarAsSetExpression(s.expression), new s.elementConstructor());
     }
     else

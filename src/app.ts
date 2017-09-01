@@ -53,8 +53,6 @@ function processQuery<T>(set: ConcreteSqlSet<T>)
     console.info(sqlify(set.expression))
 }
 
-
-
 processQuery(query(() => {
     var o = from(orders);
     var i = join(invoices).on(i => o.orderNo.eq(i.orderNo));
@@ -62,16 +60,9 @@ processQuery(query(() => {
     return { ono: o.orderNo, ino: i.invoiceNo, extra: i.order.orderNo };
 }))
 
-var order = new Order()
-
 processQuery(query(() => {
     var o = from(orders);
     var i = from(o.invoices)
-
-    console.info("ctor next")
-    console.info((o.invoices as any).elementConstructor)
-    console.info((i as any).expression)
-    console.info(i.invoiceNo)
     
     return { ono: o.orderNo, ino: i.invoiceNo };
 }))

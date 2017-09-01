@@ -169,7 +169,6 @@ class ExpressionVisitor {
             this.visitJoinExpression(join)
     }
     visitSetExpression(expression: SetExpression) {
-        console.info("visiting set expression " + (expression as any).__proto__.constructor.name)
         if (expression instanceof NamedSetExpression)
             this.visitNamedExpression(expression)
         else if (expression instanceof QueriedSetExpression)
@@ -185,7 +184,6 @@ class ExpressionVisitor {
     visitNamedExpression(expression: NamedSetExpression) { }
     //visitImmediateExpression(expression: ImmediateSetExpression) { this.unconsidered() }
     visitScalarAsSetExpression(expression: ScalarAsSetExpression) {
-        console.info("visiting set expression " + (expression.element as any))
         this.visitScalarExpression(expression.element)
     }
 
