@@ -44,14 +44,20 @@ I want at least:
   when the structure of the Lonq query is still recognizable in the resulting SQL.
 
 I've written the beginning of a query builder that could be used as research
-for a something more serious in the future.
+for a something more serious in the future. It's not usable yet in any way,
+but I think I got most of the tricky stuff working to prove that the
+type inferrence and runtime query building really works the way as I
+describe in this post. This way I'd like to call LONQ (language on-boarded
+query) to have a name for it that isn't again LINQ, which would be
+confusing in the context of this post.
 
 # Queries in JavaScript and TypeScript
 
 ## Fluent expressions
 
 "Fluent" is a popular API paradigm often used for set comprehensions, among
-other things. Underscore/Lodash uses it, so it's what people expect.
+other things. [Underscore](http://underscorejs.org/)/[Lodash](https://lodash.com/) uses it, so JavaScript folk are used to it as much
+as anyone.
 
     const newSet = someSet
         .where(p => p.age.gt(18))
@@ -151,12 +157,12 @@ factor on the query in the context and returns
 
 One tricky bit regarding elements is that sometimes they are themselves sets.
 In the last code snippet, `o.invoices` can be used as an argument to `from`,
-although it is really a `SqlElement` and not a `SqlSet`. It can still be
+although it is really a `LonqElement` and not a `LonqSet`. It can still be
 used with proper type inferrence as long as the type is an array type.
 
-On proper `SqlSet`s, however, we the fluent methods mentioned earlier, which
-are of course missing in `SqlElement`. It would be possible to insert
-them at runtime for only those `SqlElement`s that are in fact sets, but
+On proper `LonqSet`s, however, we the fluent methods mentioned earlier, which
+are of course missing in `LonqElement`. It would be possible to insert
+them at runtime for only those `LonqElement`s that are in fact sets, but
 there's no way to express that in TypeScript's type system.
 
 We certainly don't want all the fluent methods on *all* elements as normal,
@@ -168,7 +174,7 @@ LINQ gets around this with
 which aren't available in JavaScript.
 
 So the best I can think of is to put *one* fluent method in *all* elements
-that gives us the `SqlElement` as a `SqlSet`:
+that gives us the `LonqElement` as a `LonqSet`:
 
     .where(o => i.invoices.asSet().any())
 

@@ -19,8 +19,8 @@ export class ImmediateSetExpression extends SetExpression {
     values: any[]
 }
 
-export class ScalarAsSetExpression extends SetExpression {
-    constructor(public element: ScalarExpression) { super() }
+export class ElementAsSetExpression extends SetExpression {
+    constructor(public element: ElementExpression) { super() }
 }
 
 // query/subquery
@@ -37,7 +37,7 @@ export class SelectExpression {
 
     orderby: OrderByExpression
 
-    select: ScalarExpression
+    select: ElementExpression
 
     distinct: boolean
 }
@@ -58,18 +58,18 @@ export class JoinExpression extends BindingExpression {
 // CONVERT, CAST, PARSE
 
 export class GroupbyExpression {
-    operands: ScalarExpression[]
+    operands: ElementExpression[]
 }
 
 export class OrderByExpression {
-    operands: ScalarExpression
+    operands: ElementExpression
 }
 
-export class ScalarExpression {
+export class ElementExpression {
 }
 
 // a single value expressed by a subquery
-export class ScalarSubqueryExpression extends ScalarExpression {
+export class ElementSubqueryExpression extends ElementExpression {
     // the subquery must have only one item in its select list
     // and only one item in its result set
     subquery: SelectExpression
@@ -79,29 +79,29 @@ export class SqlFunction {
     constructor(public name: string) { }
 }
 
-export class ApplicationExpression extends ScalarExpression {
+export class ApplicationExpression extends ElementExpression {
     operator: SqlFunction
 
-    operands: ScalarExpression[]
+    operands: ElementExpression[]
 }
 
-export class AtomicExpression extends ScalarExpression {
+export class AtomicExpression extends ElementExpression {
     constructor(public binding: BindingExpression) {
         super()
     }
 }
 
-export class MemberExpression extends ScalarExpression {
+export class MemberExpression extends ElementExpression {
     constructor(
-        public parent: ScalarExpression,
+        public parent: ElementExpression,
         public member: string
     ) { super() }
 }
 
-export class ObjectExpression extends ScalarExpression {
+export class ObjectExpression extends ElementExpression {
     constructor(
         public keys: string[],
-        public map: { [key: string]: ScalarExpression }
+        public map: { [key: string]: ElementExpression }
     ) { super() }
 }
 
@@ -113,8 +113,8 @@ export class ComparisonExpression extends PredicateExpression {
 
         public operator: string,
 
-        public lhs: ScalarExpression,
-        public rhs: ScalarExpression
+        public lhs: ElementExpression,
+        public rhs: ElementExpression
         
     ) { super() }
 }
@@ -122,7 +122,7 @@ export class ComparisonExpression extends PredicateExpression {
 export class IsNullOrNotExpression extends PredicateExpression {
     constructor(
 
-        public operand: ScalarExpression,
+        public operand: ElementExpression,
         public isNull: boolean = true
 
     ) { super() }
@@ -131,7 +131,7 @@ export class IsNullOrNotExpression extends PredicateExpression {
 export class IsInExpression extends PredicateExpression {
     constructor(
 
-        public lhs: ScalarExpression,
+        public lhs: ElementExpression,
         public rhs: SetExpression
 
     ) { super() }
@@ -163,7 +163,7 @@ export class NotExpression extends PredicateExpression {
 
 class ExpressionVisitor {
     visitSelectExpression(expression: SelectExpression) {
-        this.visitScalarExpression(expression.select)
+        this.visitElementExpression(expression.select)
         this.visitFromExpression(expression.from)
         for (var join of expression.joins)
             this.visitJoinExpression(join)
@@ -173,8 +173,8 @@ class ExpressionVisitor {
             this.visitNamedExpression(expression)
         else if (expression instanceof QueriedSetExpression)
             this.visitQueriedExpression(expression)
-        else if (expression instanceof ScalarAsSetExpression)
-            this.visitScalarAsSetExpression(expression)
+        else if (expression instanceof ElementAsSetExpression)
+            this.visitElementAsSetExpression(expression)
         else
             this.unconsidered()
     }
@@ -183,8 +183,8 @@ class ExpressionVisitor {
     }
     visitNamedExpression(expression: NamedSetExpression) { }
     //visitImmediateExpression(expression: ImmediateSetExpression) { this.unconsidered() }
-    visitScalarAsSetExpression(expression: ScalarAsSetExpression) {
-        this.visitScalarExpression(expression.element)
+    visitElementAsSetExpression(expression: ElementAsSetExpression) {
+        this.visitElementExpression(expression.element)
     }
 
     visitBindingExpression(expression: BindingExpression) {
@@ -203,9 +203,9 @@ class ExpressionVisitor {
         if (expression.on) this.visitPredicateExpression(expression.on)
     }
 
-    visitScalarExpression(expression: ScalarExpression) {
-        if (expression instanceof ScalarSubqueryExpression)
-            this.visitScalarSubqueryExpression(expression)
+    visitElementExpression(expression: ElementExpression) {
+        if (expression instanceof ElementSubqueryExpression)
+            this.visitElementSubqueryExpression(expression)
         else if (expression instanceof AtomicExpression)
             this.visitAtomicExpression(expression)
         else if (expression instanceof ApplicationExpression)
@@ -217,21 +217,21 @@ class ExpressionVisitor {
         else
             this.unconsidered()
     }
-    visitScalarSubqueryExpression(expression: ScalarSubqueryExpression) {
+    visitElementSubqueryExpression(expression: ElementSubqueryExpression) {
         this.visitSelectExpression(expression.subquery)
     }
     visitAtomicExpression(expression: AtomicExpression) {
     }
     visitApplicationExpression(expression: ApplicationExpression) {
         for (var operand of expression.operands)
-            this.visitScalarExpression(operand)
+            this.visitElementExpression(operand)
     }
     visitMemberExpression(expression: MemberExpression) {
-        this.visitScalarExpression(expression.parent)
+        this.visitElementExpression(expression.parent)
     }
     visitObjectExpression(expression: ObjectExpression) {
         for (var key of expression.keys)
-            this.visitScalarExpression(expression.map[key])
+            this.visitElementExpression(expression.map[key])
     }
 
     visitPredicateExpression(expression: PredicateExpression) {
@@ -251,8 +251,8 @@ class ExpressionVisitor {
             this.unconsidered()
     }
     visitComparisonExpression(expression: ComparisonExpression) {
-        this.visitScalarExpression(expression.lhs)
-        this.visitScalarExpression(expression.rhs)
+        this.visitElementExpression(expression.lhs)
+        this.visitElementExpression(expression.rhs)
     }
     visitLogicalBinaryExpression(expression: LogicalBinaryExpression) {
         this.visitPredicateExpression(expression.lhs)
@@ -262,10 +262,10 @@ class ExpressionVisitor {
         this.visitPredicateExpression(expression.operand)
     }
     visitIsNullOrNotExpression(expression: IsNullOrNotExpression) {
-        this.visitScalarExpression(expression.operand)
+        this.visitElementExpression(expression.operand)
     }
     visitIsInExpression(expression: IsInExpression) {
-        this.visitScalarExpression(expression.lhs)
+        this.visitElementExpression(expression.lhs)
         this.visitSetExpression(expression.rhs)
     }
     visitExistsExpression(expression: ExistsExpression) {
@@ -390,7 +390,7 @@ class SerializerVisitor extends ExpressionVisitor {
     visitSelectExpression(expression: SelectExpression) {
         this.run(() => {
             this.write('SELECT')
-            this.visitScalarExpression(expression.select)
+            this.visitElementExpression(expression.select)
         })
         
         this.run(() => {
@@ -438,9 +438,9 @@ class SerializerVisitor extends ExpressionVisitor {
     }
 
     visitComparisonExpression(expression: ComparisonExpression) {        
-        this.visitScalarExpression(expression.lhs)
+        this.visitElementExpression(expression.lhs)
         this.write(expression.operator)
-        this.visitScalarExpression(expression.rhs)
+        this.visitElementExpression(expression.rhs)
     }
     visitLogicalBinaryExpression(expression: LogicalBinaryExpression) {
         this.visitPredicateExpression(expression.lhs)
@@ -452,18 +452,18 @@ class SerializerVisitor extends ExpressionVisitor {
         this.visitPredicateExpression(expression.operand)
     }
     visitIsNullOrNotExpression(expression: IsNullOrNotExpression) {
-        this.visitScalarExpression(expression.operand)
+        this.visitElementExpression(expression.operand)
         this.write(expression.isNull ? 'IS NULL' : 'IS NOT NULL')
     }
     visitIsInExpression(expression: IsInExpression) {
-        this.visitScalarExpression(expression.lhs)
+        this.visitElementExpression(expression.lhs)
         this.visitSetExpression(expression.rhs)
     }
     visitExistsExpression(expression: ExistsExpression) {
         this.visitSetExpression(expression.operand)
     }
 
-    // Scalars
+    // Elements
 
     visitAtomicExpression(expression: AtomicExpression) {
         var identifier = this.identifiers.get(expression.binding)
@@ -477,19 +477,19 @@ class SerializerVisitor extends ExpressionVisitor {
             var hadFirst = false
             for (var op of expression.operands) {
                 if (hadFirst) this.write(',')
-                this.visitScalarExpression(op)
+                this.visitElementExpression(op)
                 hadFirst = true
             }
             this.write(')')
         })
     }
-    visitScalarSubqueryExpression(expression: ScalarSubqueryExpression) {
+    visitElementSubqueryExpression(expression: ElementSubqueryExpression) {
         this.write('(')
         this.visitSelectExpression(expression.subquery)
         this.write(')')
     }
     visitMemberExpression(expression: MemberExpression) {
-        this.visitScalarExpression(expression.parent)
+        this.visitElementExpression(expression.parent)
         this.write('.')
         this.write(expression.member)
     }
@@ -501,7 +501,7 @@ class SerializerVisitor extends ExpressionVisitor {
             hadFirst = true
             this.write(key)
             this.write(':')
-            this.visitScalarExpression(expression.map[key])
+            this.visitElementExpression(expression.map[key])
         }
         this.write('}')
     }

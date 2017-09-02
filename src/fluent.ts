@@ -13,8 +13,8 @@ import {
     ObjectExpression,
     PredicateExpression,
     QueriedSetExpression,
-    ScalarAsSetExpression,
-    ScalarExpression,
+    ElementAsSetExpression,
+    ElementExpression,
     SelectExpression,
     SetExpression,
 } from './expression';
@@ -22,17 +22,17 @@ import {
 function getProxySchemaForArray(elementConstructor: any, expression: any): ProxySchema {
     var result = new ProxySchema()
     result.target = { elementConstructor, expression }
-    result.proxyPrototype = ColumnScalar.prototype
+    result.proxyPrototype = ColumnElement.prototype
     result.process = (proxy: any) => {
     }
     result.getPropertySchema = undefined
     return result
 }
 
-function getProxySchemaForObject(expression: ScalarExpression, target: any): ProxySchema {
+function getProxySchemaForObject(expression: ElementExpression, target: any): ProxySchema {
     var result = new ProxySchema()
     result.target = target,
-    result.proxyPrototype = ColumnScalar.prototype,
+    result.proxyPrototype = ColumnElement.prototype,
     result.process = (proxy: any) => {
         proxy.expression = expression
     }
@@ -50,26 +50,26 @@ function getProxySchemaForObject(expression: ScalarExpression, target: any): Pro
     return result
 }
 
-function createScalar<T>(expression: AtomicExpression, target: any): Scalar<T> {
-    var scalar = createProxy(getProxySchemaForObject(expression, target))
-    return scalar
+function createElement<T>(expression: AtomicExpression, target: any): LonqElement<T> {
+    var element = createProxy(getProxySchemaForObject(expression, target))
+    return element
 }
 
 
-export class ColumnScalar<T> {
-    expression: ScalarExpression
+export class ColumnElement<T> {
+    expression: ElementExpression
 
-    eq(rhs: ColumnScalar<T>): Predicate { return new Predicate(new ComparisonExpression('=', this.expression, rhs.expression)) }
-    ne(rhs: ColumnScalar<T>): Predicate { return new Predicate(new ComparisonExpression('<>', this.expression, rhs.expression)) }
-    lt(rhs: ColumnScalar<T>): Predicate { return new Predicate(new ComparisonExpression('<', this.expression, rhs.expression)) }
-    gt(rhs: ColumnScalar<T>): Predicate { return new Predicate(new ComparisonExpression('>', this.expression, rhs.expression)) }
-    le(rhs: ColumnScalar<T>): Predicate { return new Predicate(new ComparisonExpression('<=', this.expression, rhs.expression)) }
-    ge(rhs: ColumnScalar<T>): Predicate { return new Predicate(new ComparisonExpression('>=', this.expression, rhs.expression)) }
+    eq(rhs: ColumnElement<T>): Predicate { return new Predicate(new ComparisonExpression('=', this.expression, rhs.expression)) }
+    ne(rhs: ColumnElement<T>): Predicate { return new Predicate(new ComparisonExpression('<>', this.expression, rhs.expression)) }
+    lt(rhs: ColumnElement<T>): Predicate { return new Predicate(new ComparisonExpression('<', this.expression, rhs.expression)) }
+    gt(rhs: ColumnElement<T>): Predicate { return new Predicate(new ComparisonExpression('>', this.expression, rhs.expression)) }
+    le(rhs: ColumnElement<T>): Predicate { return new Predicate(new ComparisonExpression('<=', this.expression, rhs.expression)) }
+    ge(rhs: ColumnElement<T>): Predicate { return new Predicate(new ComparisonExpression('>=', this.expression, rhs.expression)) }
 
-    //isIn(rhs: SqlSet<T>): Predicate { return new Predicate(new IsInExpression(this.expression, rhs.expression)) }
+    //isIn(rhs: LonqSet<T>): Predicate { return new Predicate(new IsInExpression(this.expression, rhs.expression)) }
 }
 
-export type Scalar<T> = T & ColumnScalar<T>
+export type LonqElement<T> = T & ColumnElement<T>
 
 class Predicate {
 
@@ -82,62 +82,62 @@ class Predicate {
 
 var SqlTrue: Predicate;
 
-export class ConcreteSqlSet<E> {
+export class ConcreteLonqSet<E> {
     constructor(public expression: SetExpression, public schema: any) { }
 
     any(): Predicate { return new Predicate(new ExistsExpression(this.expression)) }
 }
 
-export type SqlSet<E> = ConcreteSqlSet<E> // | Scalar<E[]>
+export type LonqSet<E> = ConcreteLonqSet<E> // | LonqElement<E[]>
 
-export function defineTable<E>(name: string, schema: E): ConcreteSqlSet<{ [P in keyof E]: Scalar<E[P]> }> {
+export function defineTable<E>(name: string, schema: E): ConcreteLonqSet<{ [P in keyof E]: LonqElement<E[P]> }> {
     var expression = new NamedSetExpression()
     expression.name = name
-    return new ConcreteSqlSet(expression, schema)
+    return new ConcreteLonqSet(expression, schema)
 }
 
-function immediate<T>(value: T): Scalar<T> { throw null; }
+function immediate<T>(value: T): LonqElement<T> { throw null; }
 
-type SqlSetLike<S> = SqlSet<S> | S[]
+type LonqSetLike<S> = LonqSet<S> | S[]
 
-export function from<S>(source: SqlSetLike<S>): Scalar<S> {
-    if (!(source instanceof ConcreteSqlSet)) source = asSet(source)
+export function from<S>(source: LonqSetLike<S>): LonqElement<S> {
+    if (!(source instanceof ConcreteLonqSet)) source = asSet(source)
     var evaluation = getCurrentEvaluation();
     if (evaluation.expression.from) return joinImpl(source)
     var fromExpression = evaluation.expression.from = new FromExpression(source.expression)
     var atomicExpression = new AtomicExpression(fromExpression)
-    var scalar = createScalar<S>(atomicExpression, source.schema)
-    return scalar
+    var element = createElement<S>(atomicExpression, source.schema)
+    return element
 }
 
-export function join<S>(source: SqlSetLike<S>): { on: (condition: (s: Scalar<S>) => Predicate) => Scalar<S> } {
+export function join<S>(source: LonqSetLike<S>): { on: (condition: (s: LonqElement<S>) => Predicate) => LonqElement<S> } {
     return {
-        on: (condition: (s: Scalar<S>) => Predicate) => joinImpl(source, condition)
+        on: (condition: (s: LonqElement<S>) => Predicate) => joinImpl(source, condition)
     }
 }
 
-function joinImpl<S>(source: SqlSetLike<S>, condition?: (s: Scalar<S>) => Predicate): Scalar<S> {
-    if (!(source instanceof ConcreteSqlSet)) source = asSet(source)
+function joinImpl<S>(source: LonqSetLike<S>, condition?: (s: LonqElement<S>) => Predicate): LonqElement<S> {
+    if (!(source instanceof ConcreteLonqSet)) source = asSet(source)
         
     var evaluation = getCurrentEvaluation();
     
     var joinExpression = new JoinExpression(source.expression)
     joinExpression.kind = condition ? 'JOIN' : 'CROSS JOIN'
     var atomicExpression = new AtomicExpression(joinExpression)
-    var scalar = createScalar<S>(atomicExpression, source.schema)
-    joinExpression.on = condition ? condition(scalar).expression : undefined
+    var element = createElement<S>(atomicExpression, source.schema)
+    joinExpression.on = condition ? condition(element).expression : undefined
 
     evaluation.expression.joins.push(joinExpression)
 
-    return scalar            
+    return element            
 }
 
 function hasCtor(o: any) {
     return o.__proto__ && o.__proto__.constructor !== Object
 }
 
-function getScalarExpressionFromScalar<T>(e: T): ScalarExpression {
-    if (e instanceof ColumnScalar)
+function getElementExpressionFromElement<T>(e: T): ElementExpression {
+    if (e instanceof ColumnElement)
         return e.expression
     else if (e instanceof Array) {
         throw "Arrays are not allowed in this context."
@@ -148,7 +148,7 @@ function getScalarExpressionFromScalar<T>(e: T): ScalarExpression {
         for (var p in e) {
             var v = e[p]
             result.keys.push(p)
-            result.map[p] = getScalarExpressionFromScalar(v)
+            result.map[p] = getElementExpressionFromElement(v)
         }
         return result
     }
@@ -163,32 +163,32 @@ function getCurrentEvaluation() {
 }
 
 export var query: {
-    <E>(monad: () => Scalar<E>): SqlSet<E>
-    <E>(monad: () => E): SqlSet<E>
+    <E>(monad: () => LonqElement<E>): LonqSet<E>
+    <E>(monad: () => E): LonqSet<E>
 }
-= <E>(monad: () => Scalar<E>) => {
+= <E>(monad: () => LonqElement<E>) => {
     evaluationStack.push({ expression: new SelectExpression() })
     try {
         var result = monad()
 
         var evaluation = getCurrentEvaluation();
-        evaluation.expression.select = getScalarExpressionFromScalar(result)
+        evaluation.expression.select = getElementExpressionFromElement(result)
 
         var setExpression = new QueriedSetExpression()
         setExpression.definition = evaluation.expression
 
-        return new ConcreteSqlSet<E>(setExpression, result)
+        return new ConcreteLonqSet<E>(setExpression, result)
     }
     finally {
         evaluationStack.pop();
     }
 }
 
-export function asSet<E>(s: SqlSetLike<E>): ConcreteSqlSet<E> {
-    if (s instanceof ConcreteSqlSet)
-        return s as any as ConcreteSqlSet<E>
-    else if (s instanceof ColumnScalar) {
-        return new ConcreteSqlSet(new ScalarAsSetExpression(s.expression), new (s as any).elementConstructor())
+export function asSet<E>(s: LonqSetLike<E>): ConcreteLonqSet<E> {
+    if (s instanceof ConcreteLonqSet)
+        return s as any as ConcreteLonqSet<E>
+    else if (s instanceof ColumnElement) {
+        return new ConcreteLonqSet(new ElementAsSetExpression(s.expression), new (s as any).elementConstructor())
     }
     else
         throw "Unexpected argument of a from or join function: " + s

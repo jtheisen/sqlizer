@@ -82,13 +82,13 @@ exports.NamedSetExpression = NamedSetExpression;
 class ImmediateSetExpression extends SetExpression {
 }
 exports.ImmediateSetExpression = ImmediateSetExpression;
-class ScalarAsSetExpression extends SetExpression {
+class ElementAsSetExpression extends SetExpression {
     constructor(element) {
         super();
         this.element = element;
     }
 }
-exports.ScalarAsSetExpression = ScalarAsSetExpression;
+exports.ElementAsSetExpression = ElementAsSetExpression;
 class SelectExpression {
     constructor() {
         this.joins = [];
@@ -113,29 +113,29 @@ exports.GroupbyExpression = GroupbyExpression;
 class OrderByExpression {
 }
 exports.OrderByExpression = OrderByExpression;
-class ScalarExpression {
+class ElementExpression {
 }
-exports.ScalarExpression = ScalarExpression;
-class ScalarSubqueryExpression extends ScalarExpression {
+exports.ElementExpression = ElementExpression;
+class ElementSubqueryExpression extends ElementExpression {
 }
-exports.ScalarSubqueryExpression = ScalarSubqueryExpression;
+exports.ElementSubqueryExpression = ElementSubqueryExpression;
 class SqlFunction {
     constructor(name) {
         this.name = name;
     }
 }
 exports.SqlFunction = SqlFunction;
-class ApplicationExpression extends ScalarExpression {
+class ApplicationExpression extends ElementExpression {
 }
 exports.ApplicationExpression = ApplicationExpression;
-class AtomicExpression extends ScalarExpression {
+class AtomicExpression extends ElementExpression {
     constructor(binding) {
         super();
         this.binding = binding;
     }
 }
 exports.AtomicExpression = AtomicExpression;
-class MemberExpression extends ScalarExpression {
+class MemberExpression extends ElementExpression {
     constructor(parent, member) {
         super();
         this.parent = parent;
@@ -143,7 +143,7 @@ class MemberExpression extends ScalarExpression {
     }
 }
 exports.MemberExpression = MemberExpression;
-class ObjectExpression extends ScalarExpression {
+class ObjectExpression extends ElementExpression {
     constructor(keys, map) {
         super();
         this.keys = keys;
@@ -200,7 +200,7 @@ class NotExpression extends PredicateExpression {
 exports.NotExpression = NotExpression;
 class ExpressionVisitor {
     visitSelectExpression(expression) {
-        this.visitScalarExpression(expression.select);
+        this.visitElementExpression(expression.select);
         this.visitFromExpression(expression.from);
         for (var join of expression.joins)
             this.visitJoinExpression(join);
@@ -210,8 +210,8 @@ class ExpressionVisitor {
             this.visitNamedExpression(expression);
         else if (expression instanceof QueriedSetExpression)
             this.visitQueriedExpression(expression);
-        else if (expression instanceof ScalarAsSetExpression)
-            this.visitScalarAsSetExpression(expression);
+        else if (expression instanceof ElementAsSetExpression)
+            this.visitElementAsSetExpression(expression);
         else
             this.unconsidered();
     }
@@ -219,8 +219,8 @@ class ExpressionVisitor {
         this.visitSelectExpression(expression.definition);
     }
     visitNamedExpression(expression) { }
-    visitScalarAsSetExpression(expression) {
-        this.visitScalarExpression(expression.element);
+    visitElementAsSetExpression(expression) {
+        this.visitElementExpression(expression.element);
     }
     visitBindingExpression(expression) {
         if (expression instanceof FromExpression)
@@ -238,9 +238,9 @@ class ExpressionVisitor {
         if (expression.on)
             this.visitPredicateExpression(expression.on);
     }
-    visitScalarExpression(expression) {
-        if (expression instanceof ScalarSubqueryExpression)
-            this.visitScalarSubqueryExpression(expression);
+    visitElementExpression(expression) {
+        if (expression instanceof ElementSubqueryExpression)
+            this.visitElementSubqueryExpression(expression);
         else if (expression instanceof AtomicExpression)
             this.visitAtomicExpression(expression);
         else if (expression instanceof ApplicationExpression)
@@ -252,21 +252,21 @@ class ExpressionVisitor {
         else
             this.unconsidered();
     }
-    visitScalarSubqueryExpression(expression) {
+    visitElementSubqueryExpression(expression) {
         this.visitSelectExpression(expression.subquery);
     }
     visitAtomicExpression(expression) {
     }
     visitApplicationExpression(expression) {
         for (var operand of expression.operands)
-            this.visitScalarExpression(operand);
+            this.visitElementExpression(operand);
     }
     visitMemberExpression(expression) {
-        this.visitScalarExpression(expression.parent);
+        this.visitElementExpression(expression.parent);
     }
     visitObjectExpression(expression) {
         for (var key of expression.keys)
-            this.visitScalarExpression(expression.map[key]);
+            this.visitElementExpression(expression.map[key]);
     }
     visitPredicateExpression(expression) {
         if (expression instanceof ComparisonExpression)
@@ -285,8 +285,8 @@ class ExpressionVisitor {
             this.unconsidered();
     }
     visitComparisonExpression(expression) {
-        this.visitScalarExpression(expression.lhs);
-        this.visitScalarExpression(expression.rhs);
+        this.visitElementExpression(expression.lhs);
+        this.visitElementExpression(expression.rhs);
     }
     visitLogicalBinaryExpression(expression) {
         this.visitPredicateExpression(expression.lhs);
@@ -296,10 +296,10 @@ class ExpressionVisitor {
         this.visitPredicateExpression(expression.operand);
     }
     visitIsNullOrNotExpression(expression) {
-        this.visitScalarExpression(expression.operand);
+        this.visitElementExpression(expression.operand);
     }
     visitIsInExpression(expression) {
-        this.visitScalarExpression(expression.lhs);
+        this.visitElementExpression(expression.lhs);
         this.visitSetExpression(expression.rhs);
     }
     visitExistsExpression(expression) {
@@ -407,7 +407,7 @@ class SerializerVisitor extends ExpressionVisitor {
     visitSelectExpression(expression) {
         this.run(() => {
             this.write('SELECT');
-            this.visitScalarExpression(expression.select);
+            this.visitElementExpression(expression.select);
         });
         this.run(() => {
             this.visitFromExpression(expression.from);
@@ -450,9 +450,9 @@ class SerializerVisitor extends ExpressionVisitor {
         this.write(expression.name);
     }
     visitComparisonExpression(expression) {
-        this.visitScalarExpression(expression.lhs);
+        this.visitElementExpression(expression.lhs);
         this.write(expression.operator);
-        this.visitScalarExpression(expression.rhs);
+        this.visitElementExpression(expression.rhs);
     }
     visitLogicalBinaryExpression(expression) {
         this.visitPredicateExpression(expression.lhs);
@@ -464,11 +464,11 @@ class SerializerVisitor extends ExpressionVisitor {
         this.visitPredicateExpression(expression.operand);
     }
     visitIsNullOrNotExpression(expression) {
-        this.visitScalarExpression(expression.operand);
+        this.visitElementExpression(expression.operand);
         this.write(expression.isNull ? 'IS NULL' : 'IS NOT NULL');
     }
     visitIsInExpression(expression) {
-        this.visitScalarExpression(expression.lhs);
+        this.visitElementExpression(expression.lhs);
         this.visitSetExpression(expression.rhs);
     }
     visitExistsExpression(expression) {
@@ -488,19 +488,19 @@ class SerializerVisitor extends ExpressionVisitor {
             for (var op of expression.operands) {
                 if (hadFirst)
                     this.write(',');
-                this.visitScalarExpression(op);
+                this.visitElementExpression(op);
                 hadFirst = true;
             }
             this.write(')');
         });
     }
-    visitScalarSubqueryExpression(expression) {
+    visitElementSubqueryExpression(expression) {
         this.write('(');
         this.visitSelectExpression(expression.subquery);
         this.write(')');
     }
     visitMemberExpression(expression) {
-        this.visitScalarExpression(expression.parent);
+        this.visitElementExpression(expression.parent);
         this.write('.');
         this.write(expression.member);
     }
@@ -513,7 +513,7 @@ class SerializerVisitor extends ExpressionVisitor {
             hadFirst = true;
             this.write(key);
             this.write(':');
-            this.visitScalarExpression(expression.map[key]);
+            this.visitElementExpression(expression.map[key]);
         }
         this.write('}');
     }
@@ -617,7 +617,7 @@ const expression_1 = __webpack_require__(0);
 function getProxySchemaForArray(elementConstructor, expression) {
     var result = new proxy_1.ProxySchema();
     result.target = { elementConstructor, expression };
-    result.proxyPrototype = ColumnScalar.prototype;
+    result.proxyPrototype = ColumnElement.prototype;
     result.process = (proxy) => {
     };
     result.getPropertySchema = undefined;
@@ -626,7 +626,7 @@ function getProxySchemaForArray(elementConstructor, expression) {
 function getProxySchemaForObject(expression, target) {
     var result = new proxy_1.ProxySchema();
     result.target = target,
-        result.proxyPrototype = ColumnScalar.prototype,
+        result.proxyPrototype = ColumnElement.prototype,
         result.process = (proxy) => {
             proxy.expression = expression;
         };
@@ -643,11 +643,11 @@ function getProxySchemaForObject(expression, target) {
     };
     return result;
 }
-function createScalar(expression, target) {
-    var scalar = proxy_1.createProxy(getProxySchemaForObject(expression, target));
-    return scalar;
+function createElement(expression, target) {
+    var element = proxy_1.createProxy(getProxySchemaForObject(expression, target));
+    return element;
 }
-class ColumnScalar {
+class ColumnElement {
     eq(rhs) { return new Predicate(new expression_1.ComparisonExpression('=', this.expression, rhs.expression)); }
     ne(rhs) { return new Predicate(new expression_1.ComparisonExpression('<>', this.expression, rhs.expression)); }
     lt(rhs) { return new Predicate(new expression_1.ComparisonExpression('<', this.expression, rhs.expression)); }
@@ -655,7 +655,7 @@ class ColumnScalar {
     le(rhs) { return new Predicate(new expression_1.ComparisonExpression('<=', this.expression, rhs.expression)); }
     ge(rhs) { return new Predicate(new expression_1.ComparisonExpression('>=', this.expression, rhs.expression)); }
 }
-exports.ColumnScalar = ColumnScalar;
+exports.ColumnElement = ColumnElement;
 class Predicate {
     constructor(expression) {
         this.expression = expression;
@@ -664,31 +664,31 @@ class Predicate {
     or(rhs) { throw new Predicate(new expression_1.LogicalBinaryExpression('OR', this.expression, rhs.expression)); }
 }
 var SqlTrue;
-class ConcreteSqlSet {
+class ConcreteLonqSet {
     constructor(expression, schema) {
         this.expression = expression;
         this.schema = schema;
     }
     any() { return new Predicate(new expression_1.ExistsExpression(this.expression)); }
 }
-exports.ConcreteSqlSet = ConcreteSqlSet;
+exports.ConcreteLonqSet = ConcreteLonqSet;
 function defineTable(name, schema) {
     var expression = new expression_1.NamedSetExpression();
     expression.name = name;
-    return new ConcreteSqlSet(expression, schema);
+    return new ConcreteLonqSet(expression, schema);
 }
 exports.defineTable = defineTable;
 function immediate(value) { throw null; }
 function from(source) {
-    if (!(source instanceof ConcreteSqlSet))
+    if (!(source instanceof ConcreteLonqSet))
         source = asSet(source);
     var evaluation = getCurrentEvaluation();
     if (evaluation.expression.from)
         return joinImpl(source);
     var fromExpression = evaluation.expression.from = new expression_1.FromExpression(source.expression);
     var atomicExpression = new expression_1.AtomicExpression(fromExpression);
-    var scalar = createScalar(atomicExpression, source.schema);
-    return scalar;
+    var element = createElement(atomicExpression, source.schema);
+    return element;
 }
 exports.from = from;
 function join(source) {
@@ -698,22 +698,22 @@ function join(source) {
 }
 exports.join = join;
 function joinImpl(source, condition) {
-    if (!(source instanceof ConcreteSqlSet))
+    if (!(source instanceof ConcreteLonqSet))
         source = asSet(source);
     var evaluation = getCurrentEvaluation();
     var joinExpression = new expression_1.JoinExpression(source.expression);
     joinExpression.kind = condition ? 'JOIN' : 'CROSS JOIN';
     var atomicExpression = new expression_1.AtomicExpression(joinExpression);
-    var scalar = createScalar(atomicExpression, source.schema);
-    joinExpression.on = condition ? condition(scalar).expression : undefined;
+    var element = createElement(atomicExpression, source.schema);
+    joinExpression.on = condition ? condition(element).expression : undefined;
     evaluation.expression.joins.push(joinExpression);
-    return scalar;
+    return element;
 }
 function hasCtor(o) {
     return o.__proto__ && o.__proto__.constructor !== Object;
 }
-function getScalarExpressionFromScalar(e) {
-    if (e instanceof ColumnScalar)
+function getElementExpressionFromElement(e) {
+    if (e instanceof ColumnElement)
         return e.expression;
     else if (e instanceof Array) {
         throw "Arrays are not allowed in this context.";
@@ -726,7 +726,7 @@ function getScalarExpressionFromScalar(e) {
         for (var p in e) {
             var v = e[p];
             result.keys.push(p);
-            result.map[p] = getScalarExpressionFromScalar(v);
+            result.map[p] = getElementExpressionFromElement(v);
         }
         return result;
     }
@@ -740,20 +740,20 @@ exports.query = (monad) => {
     try {
         var result = monad();
         var evaluation = getCurrentEvaluation();
-        evaluation.expression.select = getScalarExpressionFromScalar(result);
+        evaluation.expression.select = getElementExpressionFromElement(result);
         var setExpression = new expression_1.QueriedSetExpression();
         setExpression.definition = evaluation.expression;
-        return new ConcreteSqlSet(setExpression, result);
+        return new ConcreteLonqSet(setExpression, result);
     }
     finally {
         evaluationStack.pop();
     }
 };
 function asSet(s) {
-    if (s instanceof ConcreteSqlSet)
+    if (s instanceof ConcreteLonqSet)
         return s;
-    else if (s instanceof ColumnScalar) {
-        return new ConcreteSqlSet(new expression_1.ScalarAsSetExpression(s.expression), new s.elementConstructor());
+    else if (s instanceof ColumnElement) {
+        return new ConcreteLonqSet(new expression_1.ElementAsSetExpression(s.expression), new s.elementConstructor());
     }
     else
         throw "Unexpected argument of a from or join function: " + s;
