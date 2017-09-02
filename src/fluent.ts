@@ -22,7 +22,7 @@ import {
 function getProxySchemaForArray(elementConstructor: any, expression: any): ProxySchema {
     var result = new ProxySchema()
     result.target = { elementConstructor, expression }
-    result.proxyPrototype = ColumnElement.prototype
+    result.proxyPrototype = ConcreteLonqElement.prototype
     result.process = (proxy: any) => {
     }
     result.getPropertySchema = undefined
@@ -32,7 +32,7 @@ function getProxySchemaForArray(elementConstructor: any, expression: any): Proxy
 function getProxySchemaForObject(expression: ElementExpression, target: any): ProxySchema {
     var result = new ProxySchema()
     result.target = target,
-    result.proxyPrototype = ColumnElement.prototype,
+    result.proxyPrototype = ConcreteLonqElement.prototype,
     result.process = (proxy: any) => {
         proxy.expression = expression
     }
@@ -56,20 +56,20 @@ function createElement<T>(expression: AtomicExpression, target: any): LonqElemen
 }
 
 
-export class ColumnElement<T> {
+export class ConcreteLonqElement<T> {
     expression: ElementExpression
 
-    eq(rhs: ColumnElement<T>): Predicate { return new Predicate(new ComparisonExpression('=', this.expression, rhs.expression)) }
-    ne(rhs: ColumnElement<T>): Predicate { return new Predicate(new ComparisonExpression('<>', this.expression, rhs.expression)) }
-    lt(rhs: ColumnElement<T>): Predicate { return new Predicate(new ComparisonExpression('<', this.expression, rhs.expression)) }
-    gt(rhs: ColumnElement<T>): Predicate { return new Predicate(new ComparisonExpression('>', this.expression, rhs.expression)) }
-    le(rhs: ColumnElement<T>): Predicate { return new Predicate(new ComparisonExpression('<=', this.expression, rhs.expression)) }
-    ge(rhs: ColumnElement<T>): Predicate { return new Predicate(new ComparisonExpression('>=', this.expression, rhs.expression)) }
+    eq(rhs: ConcreteLonqElement<T>): Predicate { return new Predicate(new ComparisonExpression('=', this.expression, rhs.expression)) }
+    ne(rhs: ConcreteLonqElement<T>): Predicate { return new Predicate(new ComparisonExpression('<>', this.expression, rhs.expression)) }
+    lt(rhs: ConcreteLonqElement<T>): Predicate { return new Predicate(new ComparisonExpression('<', this.expression, rhs.expression)) }
+    gt(rhs: ConcreteLonqElement<T>): Predicate { return new Predicate(new ComparisonExpression('>', this.expression, rhs.expression)) }
+    le(rhs: ConcreteLonqElement<T>): Predicate { return new Predicate(new ComparisonExpression('<=', this.expression, rhs.expression)) }
+    ge(rhs: ConcreteLonqElement<T>): Predicate { return new Predicate(new ComparisonExpression('>=', this.expression, rhs.expression)) }
 
     //isIn(rhs: LonqSet<T>): Predicate { return new Predicate(new IsInExpression(this.expression, rhs.expression)) }
 }
 
-export type LonqElement<T> = T & ColumnElement<T>
+export type LonqElement<T> = T & ConcreteLonqElement<T>
 
 class Predicate {
 
@@ -137,7 +137,7 @@ function hasCtor(o: any) {
 }
 
 function getElementExpressionFromElement<T>(e: T): ElementExpression {
-    if (e instanceof ColumnElement)
+    if (e instanceof ConcreteLonqElement)
         return e.expression
     else if (e instanceof Array) {
         throw "Arrays are not allowed in this context."
@@ -187,7 +187,7 @@ export var query: {
 export function asSet<E>(s: LonqSetLike<E>): ConcreteLonqSet<E> {
     if (s instanceof ConcreteLonqSet)
         return s as any as ConcreteLonqSet<E>
-    else if (s instanceof ColumnElement) {
+    else if (s instanceof ConcreteLonqElement) {
         return new ConcreteLonqSet(new ElementAsSetExpression(s.expression), new (s as any).elementConstructor())
     }
     else

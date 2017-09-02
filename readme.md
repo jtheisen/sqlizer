@@ -1,63 +1,74 @@
 # Teaser
 
-Imagine the following JavaScript would translate into SQL and fetch the
-respective data - while even being type safe when using TypeScript:
+Imagine the following JavaScript would translate into SQL and fetch the 
+respective data - while even being type safe when using TypeScript: 
 
 ```
+    var result = fetch(query(() => {
+        var o = from(orders);
+        var i = join(invoices).on(i => o.orderNo.eq(i.orderNo));
+
+        return { o, i };
+    }))
 ```
 
-Under TypeScript, the type of `result` is even inferred from the query
-as this query doesn't select a predefined model type.
+Under TypeScript, the type of `result` is even inferred from the query as this 
+query obviously doesn't select a predefined model type. 
 
-# Abstract
+I've have a proof of concept that this is possible on GitHub.
 
-I currently do server-side work with .NET and so I'm used to using LINQ to query
-databases. In case you don't know what that is: It's a combination of language
-and library constructs on .NET that allow you to write compact, expressive and
-type-safe queries against various data sources, the most important of which are
-of course SQL databases. For those, LINQ is translated to SQL at runtime.
+# Motivation
 
-There's more than one ORM that can be used with LINQ to query SQL databases,
-but I'm mostly familiar with Microsoft's Entity Framework.
+I currently do server-side work with .NET and so I'm used to using LINQ to 
+query databases. In case you don't know what that is: It's a combination of 
+language and library constructs on .NET that allow you to write compact, 
+expressive and type-safe queries against various data sources, the most 
+important of which are of course SQL databases. For those, LINQ is translated 
+to SQL at runtime. 
 
-.NET is a damn good platform, but like most people, I've come to make my peace
-with the fact that there's no way around doing a lot of JavaScript, too. And
-when clients are written in JavaScript anyway, it stands to reason to consider
-ditching .NET altogether and go with Node.js in order to benefit from shared
-code and a shared data model.
+There's more than one ORM that can be used with LINQ to query SQL databases, 
+but I'm mostly familiar with Microsoft's Entity Framework. 
 
-The one thing that keeps me from going this route for new applications is the
-fact that there is really nothing in JavaScript (or any non-.NET language for
-that matter) that plays in LINQ/Entity Frameworks league.
+.NET is a damn good platform, but like most people, I've come to make my peace 
+with the fact that there's no way around doing a lot of JavaScript, too. And 
+when clients are written in JavaScript anyway, it stands to reason to consider 
+ditching .NET altogether and go with Node.js in order to benefit from shared 
+code and a shared data model. 
+
+The one thing that keeps me from going this route for new applications is the 
+fact that there is really nothing in JavaScript (or any non-.NET language for 
+that matter) that plays in LINQ/Entity Frameworks league. 
 
 I want at least:
 
-* Type-safety when using TypeScript (on the *data model*, not just the ORM's API)
-* Queries should look elegant and be easily comprehensible
-  (especially joins and infix operators make our lives difficult without special
-  language support)
-* Arbitrary result set types, not just sets of predefined model types
-  (sometimes called "projections") as shown in the teaser; we can live with
-  not being able to write back rows fetched that way
-* The resulting SQL should be somewhat readable for the sake of the debugging
-  that will be necessary on occasion. For the same reason, it is beneficial
-  when the structure of the Lonq query is still recognizable in the resulting SQL.
+* Type-safety when using TypeScript (on the *data model* when building 
+  queryies, not just the ORM's API) 
+* Queries should look elegant and be easily comprehensible (especially joins 
+  and infix operators make our lives difficult without special language 
+  support) 
+* Arbitrary result set types, not just sets of predefined model types 
+  (sometimes called "projections") as shown in the teaser; we can live with 
+  not being able to write back rows fetched that way 
+* The resulting SQL should be somewhat readable for the sake of the debugging 
+  that will be necessary on occasion. For the same reason, it is beneficial 
+  when the structure of the original query is still recognizable in the 
+  resulting SQL. 
 
-I've written the beginning of a query builder that could be used as research
-for a something more serious in the future. It's not usable yet in any way,
-but I think I got most of the tricky stuff working to prove that the
-type inferrence and runtime query building really works the way as I
-describe in this post. This way I'd like to call LONQ (language on-boarded
-query) to have a name for it that isn't again LINQ, which would be
-confusing in the context of this post.
+I've written the beginning of a query builder that could be used as research 
+for a something more serious in the future. It's not usable yet in any way, 
+but I think I got most of the tricky stuff working to prove that the type 
+inferrence and runtime query building really works the way as I describe in 
+this post. I'd like to call this *LONQ* (language on-boarded query) to have 
+a name for it that isn't again LINQ, which would be confusing in the context 
+of this post. 
 
-# Queries in JavaScript and TypeScript
+# Query building in JavaScript and TypeScript
 
 ## Fluent expressions
 
-"Fluent" is a popular API paradigm often used for set comprehensions, among
-other things. [Underscore](http://underscorejs.org/)/[Lodash](https://lodash.com/) uses it, so JavaScript folk are used to it as much
-as anyone.
+"Fluent" is a popular API paradigm often used for set comprehensions, among 
+other things. [Underscore](http://underscorejs.org/)/[Lodash](https://lodash.com/) 
+uses it, so JavaScript folk are used to it as much as anyone. 
 
     const newSet = someSet
         .where(p => p.age.gt(18))
@@ -69,15 +80,15 @@ an expression tree from which later the SQL can be rendered.
 
 ### Sets
 
-The type of someSet would be something like `LonqSet<Person>`, where `Person`
+The type of `someSet` would be something like `LonqSet<Person>`, where `Person`
 is a user-defined entity type. The resulting `newSet` is correctly inferred
 to have the type `LonqSet<number>`.
 
-Such `LonqSet`s have an `expression` property that contains the expression it represents.
-For example, `someSet` could have a `NamedSetExpression` that represents
-a table/entity in the database. Then `someSet.Where(p => p.age.gt(18))`'s
-expression would be a `QueriedSetExpression` which refers to the former
-`NamedSetExpression`.
+Such `LonqSet`s have an `expression` property that contains the expression it 
+represents. For example, `someSet` could have a `NamedSetExpression` that 
+represents a table/entity in the database. Then `someSet.Where(p => 
+p.age.gt(18))`'s expression would be a `QueriedSetExpression` which refers to 
+the former `NamedSetExpression`. 
 
 ### Elements
 
@@ -92,31 +103,32 @@ as `p.age` - both as a TypeScript type and at as a JavaScript object at runtime.
 Note that obviously `p` can't just be a simple instance of `Person` as we need
 `p.age` to represent something containing an `expression` property.
 
-To make this work at runtime, the lambdas of `map` and `where` are called with
-mock objects that have all the properties of the user's model but instead
-of returning actual values, they return again `LonqElement`s with the
-`expression` property containing a `MemberExpression` which then ultimately
+To make this work at runtime, the lambdas of `map` and `where` are called with 
+mock objects that have all the properties of the user's model but instead of 
+returning actual values, they return again `LonqElement`s with the 
+`expression` property containing a `MemberExpression` which then ultimately 
 becomes part of the query's whole expression tree.
 
 The mock object also contains a number of methods for fluently writing
 operator calls such as `gt` (greater than).
 
-To make this work at compile time in TypeScript, the user model types are
-recursively [mapped](https://www.typescriptlang.org/docs/handbook/advanced-types.html)
-to `LonqElement`s. So for example, if you have a `LonqSet<Person>`
-then the `p` in the lambdas becomes `LonqElement<Perons>` and `p.age`
-becomes `LonqElement<number>`.
+To make this work at compile time in TypeScript, the user model types are 
+recursively [mapped](https://www.typescriptlang.org/docs/handbook/advanced-types.html) 
+to `LonqElement`s. So for example, if you have a `LonqSet<Person>` then the 
+`p` in the lambdas becomes `LonqElement<Perons>` and `p.age` becomes 
+`LonqElement<number>`. 
 
-The element types being `LonqElement`s is also an important safeguard
-against the user accidently calling a function that, for example, expects
-a real `Person` entity rather than meaning to contribute to an expression.
+The element types being `LonqElement`s is also an important safeguard against 
+the user accidently calling a function that, for example, expects a real 
+`Person` entity rather than meaning to contribute to an expression. 
 
 ## Pseudo-monadic expressions
 
-There's one thing where a pure fluent approach becomes extremely awkward: Joins.
+There's one thing where a pure fluent approach becomes very awkward: Joins. 
 
-LINQ offers a special so-called "query syntax" as a way to express them
-conveniently like this:
+LINQ offers a special so-called ["query 
+syntax"](https://docs.microsoft.com/en-us/dotnet/csharp/programming-guide/concepts/linq/query-syntax-and-method-syntax-in-linq) 
+as a way to express them conveniently like this: 
 
     from o in Orders
     from i in o.Invoices
@@ -131,12 +143,13 @@ That's certainly something that could be done in JavaScript, but it's very
 confusing - which is of course why the LINQ query syntax was created.
 
 The problem here is that we want an expression syntax that allows us to
-introduce new symbols `o` and `i` within the expression. Some functional
+introduce new symbols (`o` and `i`) within the expression. Some functional
 languages such as Haskell allow that with support for something call
-a *monad*.
+a [*monad*](https://en.wikipedia.org/wiki/Monad_(functional_programming)).
 
-JavaScript has neither monads nor a LINQ query syntax, but I would like to suggest
-a workaround that would work in any language: the *pseudo-monadic expression*:
+JavaScript has neither monads nor a LINQ query syntax, but I would like to 
+suggest a workaround that would work in any language: the *pseudo-monadic 
+expression*: 
 
     query(() => {
         const o = from(orders);
@@ -147,39 +160,39 @@ a workaround that would work in any language: the *pseudo-monadic expression*:
 
 It's certainly very readable.
 
-The way this works is that the query function sets up a context in which
-to evaluate the given lambda. That context contains a mutable structure
-representing the subquery that is going to be build. The lambda is
-then called and certain functions such as `from` register a new join
-factor on the query in the context and returns 
+The way this works is that the query function sets up a context in which to 
+evaluate the given lambda. That context contains a mutable structure 
+representing the subquery that is going to be build. The lambda is then called 
+and certain functions such as `from` register a new join factor on the query 
+in the context and returns 
 
 ### Elements can be sets
 
-One tricky bit regarding elements is that sometimes they are themselves sets.
-In the last code snippet, `o.invoices` can be used as an argument to `from`,
-although it is really a `LonqElement` and not a `LonqSet`. It can still be
-used with proper type inferrence as long as the type is an array type.
+One tricky bit regarding elements is that sometimes they are themselves sets. 
+In the last code snippet, `o.invoices` can be used as an argument to `from`, 
+although it is really a `LonqElement` and not a `LonqSet`. It can still be 
+used with proper type inferrence as long as the type is an array type. 
 
-On proper `LonqSet`s, however, we the fluent methods mentioned earlier, which
-are of course missing in `LonqElement`. It would be possible to insert
-them at runtime for only those `LonqElement`s that are in fact sets, but
-there's no way to express that in TypeScript's type system.
+On proper `LonqSet`s, however, we the fluent methods mentioned earlier, which 
+are of course missing in `LonqElement`. It would be possible to insert them at 
+runtime for only those `LonqElement`s that are in fact sets, but there's no 
+way to express that in TypeScript's type system. 
 
-We certainly don't want all the fluent methods on *all* elements as normal,
-non-set elements have all the user-defined model properties the fluent
-methods could collide with.
+We certainly don't want all the fluent methods on *all* elements as normal, 
+non-set elements have all the user-defined model properties the fluent methods 
+could collide with. 
 
-LINQ gets around this with
-[extension methods](https://docs.microsoft.com/en-us/dotnet/csharp/programming-guide/classes-and-structs/extension-methods),
-which aren't available in JavaScript.
+LINQ gets around this with [extension 
+methods](https://docs.microsoft.com/en-us/dotnet/csharp/programming-guide/classes-and-structs/extension-methods), 
+which aren't available in JavaScript. 
 
-So the best I can think of is to put *one* fluent method in *all* elements
-that gives us the `LonqElement` as a `LonqSet`:
+So the best I can think of is to put *one* fluent method in *all* elements 
+that gives us the `LonqElement` as a `LonqSet`: 
 
     .where(o => i.invoices.asSet().any())
 
-Query building would throw an exception on calling this method on non-array
-elements:
+Query building would throw an exception on calling this method on non-array 
+elements: 
 
     .where(o => i.any())   // compiles but throws at query build time
 
@@ -192,9 +205,9 @@ forces one to repeat the same expression twice:
     FROM someTable
     ORDERBY TRIM(untrimmed)
 
-If the expression was more complex than `TRIM(untrimmed)` you can see how that's
-cumbersome. You can work around that by doing a subquery, but that's argueably
-even more convoluted. In LINQ it's just
+If the expression was more complex than `TRIM(untrimmed)` you can see how 
+that's cumbersome. You can work around that by doing a subquery, but that's 
+argueably even more convoluted. In LINQ it's just 
 
     from r in someTable
     let trimmed = r.untrimmed.Trim()
@@ -205,31 +218,32 @@ TODO
 
 # The right level of abstraction
 
-Nobody wants to write SQL itself, even if it was type-safe and would integrate
-nicely into a host language like JavaScript. One wants at least *some*
-abstraction on top of that, the most common for ORMs being implict joins
-through navigational properties. On the other hand, it shouldn't be entirely
-mystical how the SQL is being generated.
+Nobody wants to write SQL itself, even if it was type-safe and would integrate 
+nicely into a host language like JavaScript. One wants at least *some* 
+abstraction on top of that, the most common for ORMs being implict joins 
+through navigational properties. On the other hand, it shouldn't be entirely 
+mystical how the SQL is being generated and the resulting SQL should resemble
+the original query to make debugging easier.
 
 ## We want to query graphs, not tables
 
-Another common thing is that ORM query results are technically graphs (with
-relationships being the edges), whereas SQL results are usually flat tables.
-Sql Server for can indeed return subgraphs (or rather subtrees, but
-that's close enough) by returning XML or JSON, but I don't know to what extent
-that's common in other database servers.
-
+One common thing is that ORM query results are technically graphs (with 
+relationships being the edges), whereas SQL results are usually flat tables. 
+Sql Server can indeed return subgraphs (or rather subtrees, but that's close 
+enough) by returning XML or JSON, but I don't know to what extent that's 
+common in other database servers. 
 
 ## Named subqueries
 
 In LINQ you can write
 
     var orders = Orders.Where(o => !o.IsDeleted);
-    var result = orders.Select(o => o.CreatedBy).Union(orders.Select(o => o.LastModifiedBy))
+    var result = orders.Select(o => o.CreatedBy)
+        .Union(orders.Select(o => o.LastModifiedBy));
 
-giving you all people involved with non-deleted orders. The "non-deleted" set of
-orders is factored out here, something that in SQL is called a *common table expression*
-(CTE):
+giving you all people involved with non-deleted orders. The "non-deleted" set 
+of orders is factored out here, something that in SQL is called a *common 
+table expression* (CTE): 
 
     WITH orders AS (
         SELECT o.* FROM Orders o WHERE o.IsDeleted = 0
@@ -238,31 +252,32 @@ orders is factored out here, something that in SQL is called a *common table exp
     UNION
     SELECT o.LastModifiedBy FROM orders o
 
-Entity Framework doesn't actually seem to translate into CTEs but puts in multiple
-copies of the same query.
+Entity Framework doesn't actually seem to translate into CTEs but puts in 
+multiple copies of the same query.q 
 
-I think it really should use CTEs, because it makes the resulting SQL more readable.
+I think it really should use CTEs, because it makes the resulting SQL more 
+readable. 
 
-## CROSS APPLYs: Cleaning up annoying join restriction in SQL
+## CROSS APPLYs: Cleaning up annoying join restrictions in SQL
 
-On writing this experiment I've learned that there is at least one more abtraction
-that one really wants to have. Consider this LINQ query:
+On writing this experiment I've learned that there is at least one more 
+abtraction that one really wants to have. Consider this LINQ query: 
 
     from o in Orders
     from i in (from i2 in Invoices where i2.OrderNo == o.OrderNo select i2).Take(1)
     select new { o, i }
 
-A second from is normally simply a cross join, but in this case the subquery
-from depends itself on `o`, the "alias" of the first join factor.
+A second from is normally simply a cross join, but in this case the subquery 
+from depends itself on `o`, the "alias" of the first join factor. 
 
-That's not possible in SQL: Joined subqueries can't reference aliases of sibling
-joins - that's why there is the separate on-clause where you *are* allowed to reference
-the aliases of all join factors. This is a somewhat arbitrary restricting that is
-motivated by the fact that in general such an arbitrary dependencies would force
-a join order.
+That's not possible in SQL: Joined subqueries can't reference aliases of 
+sibling joins - that's why there is the separate on-clause where you *are* 
+allowed to reference the aliases of all join factors. This is a somewhat 
+arbitrary restricting that is motivated by the fact that in general such an 
+arbitrary dependencies would force a join order. 
 
-Sometimes, however, they are necessary and a forced the join order is acceptable.
-Above LINQ query gets translated to this in Sql Server:
+Sometimes, however, they are necessary and a forced the join order is 
+acceptable. Above LINQ query gets translated to this in Sql Server: 
 
     SELECT 
         ...
@@ -271,25 +286,38 @@ Above LINQ query gets translated to this in Sql Server:
             FROM [dbo].[Invoices] AS [Extent2]
             WHERE [Extent2].[OrderNo] = [Extent1].[OrderNo] ) AS [Limit1]
 
-The `CROSS APPLY` is a rather young join type that allows the joined set to
-be arbitrarily dependent on aliases of sibling joins. If the set isn't the
-cross apply behaves like a cross join.
+The `CROSS APPLY` is a rather young join type that allows the joined set to be 
+arbitrarily dependent on aliases of sibling joins. If the set isn't the cross 
+apply behaves like a cross join. 
 
-There also is an `OUTER APPLY` that behaves analogously to an outer join.
+There also is an `OUTER APPLY` that behaves analogously to an outer join. 
 
-(The example only selects the first invoice for every order as when one would
-select all invoices, the query could be expressed by a simple join again by
-moving the subquery's where into an on-clause - and Entity Framework
-does this kind of optimization.)
+(The example only selects the first invoice for every order as when one would 
+select all invoices, the query could be expressed by a simple join again by 
+moving the subquery's where into an on-clause - and Entity Framework does this 
+kind of optimization.) 
 
-I could imaging that the cross apply was introduced precicely to make it
-possible to have a nicer query language such as LINQ that does away with this
-subtle bit of SQL weirdness - CROSS APPLY debuted in Sql Server 2005, LINQ in
-Visual Studio 2008. It's now part of the SQL standard.
+I could imaging that the cross apply was introduced precicely to make it 
+possible to have a nicer query language such as LINQ that does away with this 
+subtle bit of SQL weirdness - CROSS APPLY debuted in Sql Server 2005, LINQ in 
+Visual Studio 2008. It's now part of the SQL standard. 
 
-The feature is also supported by at least Oracle and PostgreSQL (for the
-latter under the name *lateral join*).
+The feature is also supported by at least Oracle and PostgreSQL (for the 
+latter under the name *lateral join*). 
 
+# Making a Pit Stop
 
+So this is about what I learned so far and I wanted to share. There will 
+certainly be more I don't yet know, but I think this is a start. 
 
+Since see myself using JavaScript/TypeScript for database access in the
+near future, this is the point where my curiosity was satisfied.
 
+On the Lonq project page I delve into some more detail about what I
+implemented and what I didn't.
+
+If you're up to writing something usable and read this post, I'd like
+to hear from you.
+
+May we at some point see the greatness of LINQ shine in other languages
+also.
