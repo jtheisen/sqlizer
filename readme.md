@@ -10,10 +10,12 @@ respective data - while even being type safe when using TypeScript:
 
         return { o, i };
     }))
+
+    if (result.length) console.info(`first order is: ${result[0].o.orderNo}`)
 ```
 
-Under TypeScript, the type of `result` is even inferred from the query as this 
-query obviously doesn't select a predefined model type. 
+Under TypeScript, the type of `result` is indeed inferred from the query's
+selection `{ o, i }` as this is obviously not some predefined model type.
 
 I've have a proof of concept that this is possible on GitHub.
 
@@ -150,14 +152,14 @@ JavaScript has neither monads nor a LINQ query syntax, but I would like to
 suggest a workaround that would work in any language: the *pseudo-monadic 
 expression*: 
 
-    query(() => {
+    processQuery(query(() => {
         const o = from(orders);
         const i = from(o.invoices)
 
-        where(not(o.isCancelled))
+        where(not(o.isCancelled.eq(0)))
 
         return { o, i };
-    })
+    }))
 
 It's certainly very readable.
 
@@ -177,13 +179,13 @@ somewhat arbitrary SQL statement form:
 
         where(not(i.isCancelled))
 
-        groupBy({ i.OrderNo })
+        groupBy({ i.orderNo })
 
         having(count().gt(0))
 
-        orderBy(i.OrderNo)
+        orderBy(i.orderNo)
 
-        return { i.OrderNo, count() }
+        return { orderNo: i.orderNo, count: count() }
     })
 
 It makes for a strong relationship between the original query and

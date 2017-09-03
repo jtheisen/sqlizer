@@ -29,17 +29,21 @@ export class SelectExpression {
 
     joins: JoinExpression[] = []
 
-    where: PredicateExpression
+    where?: PredicateExpression
 
-    groupby: GroupbyExpression
+    groupby?: ElementExpression
 
-    having: PredicateExpression
+    having?: PredicateExpression
 
-    orderby: OrderByExpression
+    orderby?: ElementExpression
+    isOrderByDescending = false
 
     select: ElementExpression
 
-    distinct: boolean
+    distinct: boolean = false
+
+    offset?: number
+    fetchOnly?: number
 }
 
 export class BindingExpression {
@@ -80,9 +84,10 @@ export class SqlFunction {
 }
 
 export class ApplicationExpression extends ElementExpression {
-    operator: SqlFunction
-
-    operands: ElementExpression[]
+    constructor(
+        public operator: SqlFunction,
+        public operands: ElementExpression[]
+    ) { super() }
 }
 
 export class AtomicExpression extends ElementExpression {
@@ -102,6 +107,12 @@ export class ObjectExpression extends ElementExpression {
     constructor(
         public keys: string[],
         public map: { [key: string]: ElementExpression }
+    ) { super() }
+}
+
+export class ConstantExpression extends ElementExpression {
+    constructor(
+        public value: any
     ) { super() }
 }
 
@@ -157,7 +168,9 @@ export class LogicalBinaryExpression extends PredicateExpression {
 }
 
 export class NotExpression extends PredicateExpression {
-    operand: PredicateExpression
+    constructor(
+        public operand: PredicateExpression
+    ) { super() }
 }
 
 
@@ -167,6 +180,18 @@ class ExpressionVisitor {
         this.visitFromExpression(expression.from)
         for (var join of expression.joins)
             this.visitJoinExpression(join)
+
+        if (expression.where)
+            this.visitPredicateExpression(expression.where)
+
+        if (expression.groupby)
+            this.visitElementExpression(expression.groupby)
+
+        if (expression.having)
+            this.visitPredicateExpression(expression.having)
+
+        if (expression.orderby)
+            this.visitElementExpression(expression.orderby)
     }
     visitSetExpression(expression: SetExpression) {
         if (expression instanceof NamedSetExpression)
@@ -214,6 +239,8 @@ class ExpressionVisitor {
             this.visitMemberExpression(expression)
         else if (expression instanceof ObjectExpression)
             this.visitObjectExpression(expression)
+        else if (expression instanceof ConstantExpression)
+            this.visitConstantExpression(expression)
         else
             this.unconsidered()
     }
@@ -233,6 +260,7 @@ class ExpressionVisitor {
         for (var key of expression.keys)
             this.visitElementExpression(expression.map[key])
     }
+    visitConstantExpression(expression: ConstantExpression) { }
 
     visitPredicateExpression(expression: PredicateExpression) {
         if (expression instanceof ComparisonExpression)
@@ -320,10 +348,12 @@ class BindingCollectorVisitor extends ExpressionVisitor {
 
     visitFromExpression(expression: FromExpression) {
         this.bindingExpressions.push(expression)
+        super.visitFromExpression(expression)
     }
 
     visitJoinExpression(expression: JoinExpression) {
         this.bindingExpressions.push(expression)
+        super.visitFromExpression(expression)
     }
 }
 var collectBindings = BindingCollectorVisitor.getBindings
@@ -390,6 +420,8 @@ class SerializerVisitor extends ExpressionVisitor {
     visitSelectExpression(expression: SelectExpression) {
         this.run(() => {
             this.write('SELECT')
+            if (expression.distinct)
+                this.write('DISTINCT')
             this.visitElementExpression(expression.select)
         })
         
@@ -399,6 +431,39 @@ class SerializerVisitor extends ExpressionVisitor {
                 this.run(() => this.visitJoinExpression(join))
             }
         })
+
+        if (expression.where) {
+            this.write('WHERE')
+            this.visitPredicateExpression(expression.where)
+        }
+
+        if (expression.groupby) {
+            this.write('GROUP BY')
+            this.visitElementExpression(expression.groupby)
+        }
+
+        if (expression.having) {
+            this.write('HAVING')
+            this.visitPredicateExpression(expression.having)
+        }
+
+        if (expression.orderby) {
+            this.write('ORDER BY')
+            this.visitElementExpression(expression.orderby)
+            if (expression.isOrderByDescending)
+                this.write('DESC')
+        }
+
+        if (expression.offset) {
+            this.write('OFFSET')
+            this.write(expression.offset.toString())
+            this.write('ROWS')
+        }
+        if (expression.offset) {
+            this.write('FETCH')
+            this.write(expression.offset.toString())
+            this.write('ROWS ONLY')
+        }
     }
 
     visitFromExpression(expression: FromExpression) {
@@ -504,6 +569,18 @@ class SerializerVisitor extends ExpressionVisitor {
             this.visitElementExpression(expression.map[key])
         }
         this.write('}')
+    }
+    visitConstantExpression(expression: ConstantExpression) {
+        var value = expression.value
+        var type = typeof(value)
+        if (type === 'boolean')
+            this.write(value ? 'TRUE' : 'FALSE')
+        else if (type === 'number')
+            this.write(value.toString())
+        else if (type === 'string')
+            this.write(value)
+        else
+            throw "Type is unsupported for constant"
     }
 
     run(nested: () => void) {

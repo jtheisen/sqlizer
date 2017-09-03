@@ -1,8 +1,12 @@
 import { createProxy, ProxySchema } from './proxy';
 import {
+    ApplicationExpression,
     AtomicExpression,
     BindingExpression,
     ComparisonExpression,
+    ConstantExpression,
+    ElementAsSetExpression,
+    ElementExpression,
     ExistsExpression,
     FromExpression,
     IsInExpression,
@@ -10,13 +14,13 @@ import {
     LogicalBinaryExpression,
     MemberExpression,
     NamedSetExpression,
+    NotExpression,
     ObjectExpression,
     PredicateExpression,
     QueriedSetExpression,
-    ElementAsSetExpression,
-    ElementExpression,
     SelectExpression,
     SetExpression,
+    SqlFunction,
 } from './expression';
 
 function getProxySchemaForArray(elementConstructor: any, expression: any): ProxySchema {
@@ -50,23 +54,33 @@ function getProxySchemaForObject(expression: ElementExpression, target: any): Pr
     return result
 }
 
-function createElement<T>(expression: AtomicExpression, target: any): SqlElement<T> {
+function createElement<T>(expression: ElementExpression, target: any): SqlElement<T> {
     var element = createProxy(getProxySchemaForObject(expression, target))
     return element
 }
 
+type ComparisonTarget<T> = ConcreteSqlElement<T> | string | number
+
+function getExpressionForComparisonTarget<T>(target: ComparisonTarget<T>) {
+    if (target instanceof ConcreteSqlElement)
+        return target.expression
+    else if (typeof(target) === 'string' || typeof(target) === 'number')
+        return new ConstantExpression(target)
+    else
+        throw "Unexpected type in comparison target."
+}
 
 export class ConcreteSqlElement<T> {
     expression: ElementExpression
 
-    eq(rhs: ConcreteSqlElement<T>): Predicate { return new Predicate(new ComparisonExpression('=', this.expression, rhs.expression)) }
-    ne(rhs: ConcreteSqlElement<T>): Predicate { return new Predicate(new ComparisonExpression('<>', this.expression, rhs.expression)) }
-    lt(rhs: ConcreteSqlElement<T>): Predicate { return new Predicate(new ComparisonExpression('<', this.expression, rhs.expression)) }
-    gt(rhs: ConcreteSqlElement<T>): Predicate { return new Predicate(new ComparisonExpression('>', this.expression, rhs.expression)) }
-    le(rhs: ConcreteSqlElement<T>): Predicate { return new Predicate(new ComparisonExpression('<=', this.expression, rhs.expression)) }
-    ge(rhs: ConcreteSqlElement<T>): Predicate { return new Predicate(new ComparisonExpression('>=', this.expression, rhs.expression)) }
+    eq(rhs: ComparisonTarget<T>): Predicate { return new Predicate(new ComparisonExpression('=', this.expression, getExpressionForComparisonTarget(rhs))) }
+    ne(rhs: ComparisonTarget<T>): Predicate { return new Predicate(new ComparisonExpression('<>', this.expression, getExpressionForComparisonTarget(rhs))) }
+    lt(rhs: ComparisonTarget<T>): Predicate { return new Predicate(new ComparisonExpression('<', this.expression, getExpressionForComparisonTarget(rhs))) }
+    gt(rhs: ComparisonTarget<T>): Predicate { return new Predicate(new ComparisonExpression('>', this.expression, getExpressionForComparisonTarget(rhs))) }
+    le(rhs: ComparisonTarget<T>): Predicate { return new Predicate(new ComparisonExpression('<=', this.expression, getExpressionForComparisonTarget(rhs))) }
+    ge(rhs: ComparisonTarget<T>): Predicate { return new Predicate(new ComparisonExpression('>=', this.expression, getExpressionForComparisonTarget(rhs))) }
 
-    //isIn(rhs: SqlSet<T>): Predicate { return new Predicate(new IsInExpression(this.expression, rhs.expression)) }
+    //isIn(rhs: SqlSet<T>): Predicate { return new Predicate(new IsInExpression(this.expression, getExpressionForComparisonTarget(rhs))) }
 }
 
 export type SqlElement<T> = T & ConcreteSqlElement<T>
@@ -103,7 +117,7 @@ type SqlSetLike<S> = SqlSet<S> | S[]
 export function from<S>(source: SqlSetLike<S>): SqlElement<S> {
     if (!(source instanceof ConcreteSqlSet)) source = asSet(source)
     var evaluation = getCurrentEvaluation();
-    if (evaluation.expression.from) return joinImpl(source)
+    if (evaluation.expression.from) return joinImpl(source, "CROSS JOIN")
     var fromExpression = evaluation.expression.from = new FromExpression(source.expression)
     var atomicExpression = new AtomicExpression(fromExpression)
     var element = createElement<S>(atomicExpression, source.schema)
@@ -112,17 +126,27 @@ export function from<S>(source: SqlSetLike<S>): SqlElement<S> {
 
 export function join<S>(source: SqlSetLike<S>): { on: (condition: (s: SqlElement<S>) => Predicate) => SqlElement<S> } {
     return {
-        on: (condition: (s: SqlElement<S>) => Predicate) => joinImpl(source, condition)
+        on: (condition: (s: SqlElement<S>) => Predicate) => joinImpl(source, "JOIN", condition)
     }
 }
 
-function joinImpl<S>(source: SqlSetLike<S>, condition?: (s: SqlElement<S>) => Predicate): SqlElement<S> {
+export function leftJoin<S>(source: SqlSetLike<S>): { on: (condition: (s: SqlElement<S>) => Predicate) => SqlElement<S> } {
+    return {
+        on: (condition: (s: SqlElement<S>) => Predicate) => joinImpl(source, "LEFT JOIN", condition)
+    }
+}
+
+export var crossJoin = makeJoin("CROSS JOIN")
+export var crossApply = makeJoin("CROSS APPLY")
+export var outerApply = makeJoin("OUTER APPLY")
+
+function joinImpl<S>(source: SqlSetLike<S>, kind: string, condition?: (s: SqlElement<S>) => Predicate): SqlElement<S> {
     if (!(source instanceof ConcreteSqlSet)) source = asSet(source)
         
     var evaluation = getCurrentEvaluation();
     
     var joinExpression = new JoinExpression(source.expression)
-    joinExpression.kind = condition ? 'JOIN' : 'CROSS JOIN'
+    joinExpression.kind = kind
     var atomicExpression = new AtomicExpression(joinExpression)
     var element = createElement<S>(atomicExpression, source.schema)
     joinExpression.on = condition ? condition(element).expression : undefined
@@ -130,6 +154,88 @@ function joinImpl<S>(source: SqlSetLike<S>, condition?: (s: SqlElement<S>) => Pr
     evaluation.expression.joins.push(joinExpression)
 
     return element            
+}
+
+// Doesn't work for some reason.
+// function makeJoinWithOn<S>(kind: string) {
+//     return function (source: SqlSetLike<S>) {
+//         return { on: (condition: (s: SqlElement<S>) => Predicate) => joinImpl(source, condition) }
+//     }
+// }
+
+function makeJoin<S>(kind: string) {
+    return function (source: SqlSetLike<S>) {
+        return joinImpl(source, kind)
+    }
+}
+
+export function where(predicate: Predicate) {
+    var evaluation = getCurrentEvaluation();
+
+    if (evaluation.expression.where) throw "Where clause set multiple times."
+
+    evaluation.expression.where = predicate.expression
+}
+
+export function having(predicate: Predicate) {
+    var evaluation = getCurrentEvaluation();
+
+    if (evaluation.expression.having) throw "Having clause set multiple times."
+
+    evaluation.expression.having = predicate.expression
+}
+
+export function not(predicate: Predicate): Predicate {
+    return new Predicate(new NotExpression(predicate.expression))
+}
+
+export function constant<T>(value: T): SqlElement<T> {
+    return createElement(new ConstantExpression(value), value)
+}
+
+export function groupBy<T>(key: SqlElement<T>) {
+    var evaluation = getCurrentEvaluation();
+
+    if (evaluation.expression.groupby) throw "Group by clause set multiple times."
+
+    evaluation.expression.groupby = key.expression
+}
+
+export function orderBy<T>(key: SqlElement<T>) {
+    var evaluation = getCurrentEvaluation();
+
+    if (evaluation.expression.orderby) throw "Order by clause set multiple times."
+
+    evaluation.expression.orderby = key.expression
+}
+
+export function orderByDesc<T>(key: SqlElement<T>) {
+    var evaluation = getCurrentEvaluation();
+
+    if (evaluation.expression.orderby) throw "Order by clause set multiple times."
+
+    evaluation.expression.orderby = key.expression
+    evaluation.expression.isOrderByDescending = true
+}
+
+export function count(): SqlElement<number> {
+    return createElement<number>(new ApplicationExpression(new SqlFunction("COUNT"), [ new ConstantExpression(1) ]), 0)
+}
+
+export function trim(text: SqlElement<string>): SqlElement<string> {
+    return createElement<string>(new ApplicationExpression(new SqlFunction("TRIM"), [ text.expression ]), '')
+}
+
+export function offsetRows(rows: number) {
+    var evaluation = getCurrentEvaluation();
+
+    evaluation.expression.offset = rows
+}
+
+export function fetchOnly(rows: number) {
+    var evaluation = getCurrentEvaluation();
+
+    evaluation.expression.fetchOnly = rows
 }
 
 function hasCtor(o: any) {
