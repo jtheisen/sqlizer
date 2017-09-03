@@ -380,6 +380,7 @@ function createIdentifiers(bindings: BindingExpression[]) {
         if (madeIdentifiers.has(suggestion) && !identifiersNeedingQualification.has(suggestion)) {
             identifiersNeedingQualification.set(suggestion, 0)
         }
+        madeIdentifiers.add(suggestion)
     }
 
     var identifiers = new Map<BindingExpression, string>()
