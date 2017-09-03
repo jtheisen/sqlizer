@@ -267,13 +267,13 @@ abtraction that one really wants to have. Consider this LINQ query:
     from i in (from i2 in Invoices where i2.OrderNo == o.OrderNo select i2).Take(1)
     select new { o, i }
 
-A second from is normally simply a cross join, but in this case the subquery 
+A second "from" is normally simply a cross join, but in this case the subquery 
 from depends itself on `o`, the "alias" of the first join factor. 
 
 That's not possible in SQL: Joined subqueries can't reference aliases of 
 sibling joins - that's why there is the separate on-clause where you *are* 
 allowed to reference the aliases of all join factors. This is a somewhat 
-arbitrary restricting that is motivated by the fact that in general such an 
+arbitrary restriction that is motivated by the fact that in general such an 
 arbitrary dependencies would force a join order. 
 
 Sometimes, however, they are necessary and a forced the join order is 
@@ -303,7 +303,11 @@ subtle bit of SQL weirdness - CROSS APPLY debuted in Sql Server 2005, LINQ in
 Visual Studio 2008. It's now part of the SQL standard. 
 
 The feature is also supported by at least Oracle and PostgreSQL (for the 
-latter under the name *lateral join*). 
+latter under the name *lateral join*).
+
+## Phases of query processing
+
+TODO 
 
 # Making a Pit Stop
 
