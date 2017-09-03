@@ -17,7 +17,7 @@ respective data - while even being type safe when using TypeScript:
 Under TypeScript, the type of `result` is indeed inferred from the query's
 selection `{ o, i }` as this is obviously not some predefined model type.
 
-I've have a proof of concept that this is possible on GitHub.
+This repo contains a proof of concept that this is possible.
 
 # Motivation
 
@@ -494,9 +494,20 @@ I feel strongly that this is the route to go.
 So this is about what I learned so far and I wanted to share. There will 
 certainly be more I don't yet know, but I think this is a start. 
 
+All queries in this readme can transformed to SQL, except that the
+selections are not flattened and implicit joins from navigational
+properties not expanded. So when you look at the rendered SQL it looks
+like this:
+
+    SELECT { x: x1, y: { nested: n1 } } FROM ...
+
+Everything missing though should be straight-forwared though. I don't
+expect any more surprises, although I do expect it to be *a lot*
+of work to be actually something usable.
+
 Since I don't see myself using JavaScript/TypeScript for database
-access in the near future, this is the point where my curiosity
-was satisfied.
+access right away, this is the point where my curiosity
+is satisfied for the time being.
 
 If you're up to writing something usable in this direction, I'd
 like to hear from you.
