@@ -40,6 +40,7 @@ function getProxySchemaForObject(expression: ElementExpression, target: any): Pr
     result.process = (proxy: any) => {
         proxy.expression = expression
     }
+    result.shouldIgnoreProperty = (name: string) => name === "expression"
     result.getPropertySchema = (name: string): ProxySchema => {
         var ntarget = target[name]
         if (Array.isArray(ntarget)) {
@@ -136,13 +137,13 @@ export function leftJoin<S>(source: SqlSetLike<S>): { on: (condition: (s: SqlEle
     }
 }
 
-export var crossJoin = makeJoin("CROSS JOIN")
-export var crossApply = makeJoin("CROSS APPLY")
-export var outerApply = makeJoin("OUTER APPLY")
+export function crossJoin<S>(source: SqlSetLike<S>) { return joinImpl(source, "CROSS JOIN") }
+export function crossApply<S>(source: SqlSetLike<S>) { return joinImpl(source, "CROSS APPLY") }
+export function outerApply<S>(source: SqlSetLike<S>) { return joinImpl(source, "OUTER APPLY") }
 
 function joinImpl<S>(source: SqlSetLike<S>, kind: string, condition?: (s: SqlElement<S>) => Predicate): SqlElement<S> {
     if (!(source instanceof ConcreteSqlSet)) source = asSet(source)
-        
+
     var evaluation = getCurrentEvaluation();
     
     var joinExpression = new JoinExpression(source.expression)
@@ -154,19 +155,6 @@ function joinImpl<S>(source: SqlSetLike<S>, kind: string, condition?: (s: SqlEle
     evaluation.expression.joins.push(joinExpression)
 
     return element            
-}
-
-// Doesn't work for some reason.
-// function makeJoinWithOn<S>(kind: string) {
-//     return function (source: SqlSetLike<S>) {
-//         return { on: (condition: (s: SqlElement<S>) => Predicate) => joinImpl(source, condition) }
-//     }
-// }
-
-function makeJoin<S>(kind: string) {
-    return function (source: SqlSetLike<S>) {
-        return joinImpl(source, kind)
-    }
 }
 
 export function where(predicate: Predicate) {
@@ -272,7 +260,7 @@ export var query: {
     <E>(monad: () => SqlElement<E>): SqlSet<E>
     <E>(monad: () => E): SqlSet<E>
 }
-= <E>(monad: () => SqlElement<E>) => {
+= <E>(monad: () => E) => {
     evaluationStack.push({ expression: new SelectExpression() })
     try {
         var result = monad()

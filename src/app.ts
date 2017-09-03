@@ -132,6 +132,7 @@ processQuery(query(() => {
 
 processQuery(query(() => {
     const o = from(orders);
+
     const i = outerApply(query(() => {
         const i2 = from(invoices);
         where(i2.orderNo.eq(o.orderNo))
@@ -139,6 +140,9 @@ processQuery(query(() => {
         return i2
     }))
 
+    console.info(o)
+    console.info(i)
+    
     return { o, i };
 }))
 
