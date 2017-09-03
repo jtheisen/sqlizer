@@ -44,7 +44,7 @@ that matter) that plays in LINQ/Entity Frameworks league.
 I want at least:
 
 * Type-safety when using TypeScript (on the *data model* when building 
-  queryies, not just the ORM's API) 
+  queries, not just the ORM's API) 
 * Queries should look elegant and be easily comprehensible (especially joins 
   and infix operators make our lives difficult without special language 
   support) 
@@ -59,9 +59,9 @@ I want at least:
 I've written the beginning of a query builder that could be used as research 
 for a something more serious in the future. It's not usable yet in any way, 
 but I think I got most of the tricky stuff working to prove that the type 
-inferrence and runtime query building really works the way as I describe in 
+inference and runtime query building really works the way as I describe in 
 this post. I will call this *Sqlizer* to have  a name for it that isn't
-again LINQ, which would be confusing in the context of this text. 
+again LINQ, which would be confusing in the context of this research. 
 
 # Query building in JavaScript and TypeScript
 
@@ -191,9 +191,9 @@ somewhat arbitrary SQL statement form:
 It makes for a strong relationship between the original query and
 the resulting SQL.
 
-### The case against compile-time safty fanaticism
+### The case against compile-time safety fanaticism
 
-An obvious objection against this constructs is that a number of
+An obvious objection against this construct is that a number of
 programming errors will only be caught at query build time.
 
 TypeScript can't check the order of `from`/`join`, `where`, `groupBy`, 
@@ -232,7 +232,7 @@ resulting expression tree.
 One tricky bit regarding elements is that sometimes they are themselves sets. 
 In the last code snippet, `o.invoices` can be used as an argument to `from`, 
 although it is really a `SqlElement` and not a `SqlSet`. It can still be 
-used with proper type inferrence as long as the type is an array type. 
+used with proper type inference as long as the type is an array type. 
 
 On proper `SqlSet`s, however, we the fluent methods mentioned earlier, which 
 are of course missing in `SqlElement`. It would be possible to insert them at 
@@ -247,7 +247,7 @@ LINQ gets around this with [extension
 methods](https://docs.microsoft.com/en-us/dotnet/csharp/programming-guide/classes-and-structs/extension-methods), 
 which aren't available in JavaScript. 
 
-So the best I can think of is to put *one* fluent method in *all* elements 
+The best I can think of is to put *one* fluent method in *all* elements 
 that gives us the `SqlElement` as a `SqlSet`: 
 
     .where(o => i.invoices.asSet().any())
@@ -337,8 +337,6 @@ I will go into two abstractions I believe shouldn't be done as
 - it makes the resulting SQL look different from the original query and/or
 - raises a wall between the query writer and SQL concepts that are beneficial
   to know about.
-
-This is only interesting for those who really come from a LINQ mindset.
 
 ### CROSS- AND OUTER APPLYs: Cleaning up annoying join restrictions in SQL
 
@@ -491,17 +489,16 @@ I feel strongly that this is the route to go.
 
 # Making a Pit Stop
 
-So this is about what I learned so far and I wanted to share. There will 
-certainly be more I don't yet know, but I think this is a start. 
+So this is about what I have so far and I wanted to share.
 
-All queries in this readme can transformed to SQL, except that the
-selections are not flattened and implicit joins from navigational
-properties not expanded. So when you look at the rendered SQL it looks
-like this:
+All queries using build with `query()` in this readme can be found in `app.ts` 
+and will render correctly, except that the selections are not flattened and 
+implicit joins from navigational properties not expanded. So when you look at 
+the rendered SQL it looks like this: 
 
     SELECT { x: x1, y: { nested: n1 } } FROM ...
 
-Everything missing though should be straight-forwared though. I don't
+Everything missing should be straight-forwared though. I don't
 expect any more surprises, although I do expect it to be *a lot*
 of work to be actually something usable.
 
@@ -509,5 +506,4 @@ Since I don't see myself using JavaScript/TypeScript for database
 access right away, this is the point where my curiosity
 is satisfied for the time being.
 
-If you're up to writing something usable in this direction, I'd
-like to hear from you.
+If you want to chat about this, feel free to drop a ticket in this repo.
