@@ -60,7 +60,7 @@ I've written the beginning of a query builder that could be used as research
 for a something more serious in the future. It's not usable yet in any way, 
 but I think I got most of the tricky stuff working to prove that the type 
 inference and runtime query building really works the way as I describe in 
-this post. I will call this *Sqlizer* to have  a name for it that isn't
+this readme. I will call this *Sqlizer* to have  a name for it that isn't
 again LINQ, which would be confusing in the context of this research. 
 
 # Query building in JavaScript and TypeScript
@@ -105,7 +105,7 @@ Note that obviously `p` can't just be a simple instance of `Person` as we need
 `p.age` to represent something containing an `expression` property.
 
 To make this work at runtime, the lambdas of `map` and `where` are called with 
-mock objects that have all the properties of the user's model but instead of 
+mock objects that have all the properties of the user's model; but instead of 
 returning actual values, they return again `SqlElement`s with the 
 `expression` property containing a `MemberExpression` which then ultimately 
 becomes part of the query's whole expression tree.
@@ -116,7 +116,7 @@ operator calls such as `gt` (greater than).
 To make this work at compile time in TypeScript, the user model types are 
 recursively [mapped](https://www.typescriptlang.org/docs/handbook/advanced-types.html) 
 to `SqlElement`s. So for example, if you have a `SqlSet<Person>` then the 
-`p` in the lambdas becomes `SqlElement<Perons>` and `p.age` becomes 
+`p` in the lambdas becomes `SqlElement<Person>` and `p.age` becomes 
 `SqlElement<number>`. 
 
 The element types being `SqlElement`s is also an important safeguard against 
@@ -167,7 +167,8 @@ The way this works is that the query function sets up a context in which to
 evaluate the given lambda. That context contains a mutable structure 
 representing the subquery that is going to be build. The lambda is then called 
 and certain functions such as `from` register a new join factor on the query 
-in the context and returns 
+in the context and returns a `SqlElement` with a `FromExpression` or 
+`JoinExpression`.
 
 ### Each pseudo-monadic expression becomes a SQL query
 
@@ -179,7 +180,7 @@ somewhat arbitrary SQL statement form:
 
         where(not(i.isCancelled))
 
-        groupBy({ i.orderNo })
+        groupBy(i.orderNo)
 
         having(count().gt(0))
 
@@ -208,14 +209,18 @@ Still, I think it's an ideological argument. Let's remember what compile-time
 safety is for: We want to catch those programming errors *that we wouldn't
 catch anyway*.
 
-This falls in the latter category because
+This falls mostly in the latter category because
 
 - on writing the query, we clearly test it manually once and
 - after renamings or other model modifications, we haven't changed the order
   of above statements or changed anything regarding grouping semantics.
 
-Those should cover most cases. Bugs will happen of course, but a different,
-more safe design would have other disadvantages that outweigh the safety benefits I believe.
+Those should cover most cases. Bugs will happen of course - but a different, 
+more safe design would have other disadvantages that outweigh the safety 
+benefits I believe. 
+
+And there's one more advantage: Runtime exceptions can *explain* what the 
+problem is (eg. "all joins must come before a where").
 
 ### Fluent combinators in terms of pseudo-monadic expression
 
@@ -234,14 +239,14 @@ In the last code snippet, `o.invoices` can be used as an argument to `from`,
 although it is really a `SqlElement` and not a `SqlSet`. It can still be 
 used with proper type inference as long as the type is an array type. 
 
-On proper `SqlSet`s, however, we the fluent methods mentioned earlier, which 
+On proper `SqlSet`s, however, we have the fluent methods mentioned earlier, which 
 are of course missing in `SqlElement`. It would be possible to insert them at 
 runtime for only those `SqlElement`s that are in fact sets, but there's no 
-way to express that in TypeScript's type system. 
+way to express that in TypeScript's type system (yet).
 
-We certainly don't want all the fluent methods on *all* elements as normal, 
+We certainly don't want all the fluent methods on *all* elements: normal, 
 non-set elements have all the user-defined model properties the fluent methods 
-could collide with. 
+could collide with.
 
 LINQ gets around this with [extension 
 methods](https://docs.microsoft.com/en-us/dotnet/csharp/programming-guide/classes-and-structs/extension-methods), 
@@ -255,24 +260,26 @@ that gives us the `SqlElement` as a `SqlSet`:
 Query building would throw an exception on calling this method on non-array 
 elements: 
 
-    .where(o => i.any())   // compiles but throws at query build time
+    .where(o => i.asSet().any())   // compiles but throws at query build time
 
 # The right level of abstraction
 
 Nobody wants to write SQL itself, even if it was type-safe and would integrate 
 nicely into a host language like JavaScript. One wants at least *some* 
 abstraction on top of that, the most common for ORMs being implict joins 
-through navigational properties. On the other hand, it shouldn't be entirely 
-mystical how the SQL is being generated and the resulting SQL should resemble
-the original query to make debugging easier.
+through navigational properties.
+
+On the other hand, it shouldn't be entirely mystical how the SQL is being 
+generated and the resulting SQL should resemble the original query to make 
+diagnostics easier: Analyzing an SQL statement's query plan is certainly not 
+something unusual, and for that we want to understand the SQL that led to it. 
 
 ## We want to query graphs, not tables
 
-One common thing is that ORM query results are technically graphs (with 
-relationships being the edges), whereas SQL results are usually flat tables. 
-Sql Server can indeed return subgraphs (or rather subtrees, but that's close 
-enough) by returning XML or JSON, but I don't know to what extent that's 
-common in other database servers. 
+ORM query results are technically graphs (with relationships being the edges), 
+whereas SQL results are usually flat tables. Sql Server can indeed return 
+subgraphs (or rather subtrees, but that's close enough) by returning XML or 
+JSON, but I don't know to what extent that's common in other database servers. 
 
 ### Named elements
 
@@ -322,20 +329,20 @@ table expression* (CTE):
     UNION
     SELECT o.LastModifiedBy FROM orders o
 
-Entity Framework doesn't actually seem to translate into CTEs but puts in 
-multiple copies of the same query.q 
+Entity Framework doesn't actually seem to translate into CTEs but rather puts 
+in multiple copies of the same query.
 
-I think it really should use CTEs, because
+I think it really should use CTEs though, because
 
 - it makes the resulting SQL more readable and
 - it makes the resulting SQL reflect the structure of the original query.
 
 ## LINQ does too much
 
-I will go into two abstractions I believe shouldn't be done as
+I will go into two abstractions I believe are a bad idea as
 
 - it makes the resulting SQL look different from the original query and/or
-- raises a wall between the query writer and SQL concepts that are beneficial
+- raises a wall between the query author and SQL concepts that are beneficial
   to know about.
 
 ### CROSS- AND OUTER APPLYs: Cleaning up annoying join restrictions in SQL
@@ -351,11 +358,11 @@ from depends itself on `o`, the "alias" of the first join factor.
 
 That's not possible in SQL: Joined subqueries can't reference aliases of 
 sibling joins - that's why there is the separate on-clause where you *are* 
-allowed to reference the aliases of all join factors. This is a somewhat 
-arbitrary restriction that is motivated by the fact that in general such an 
+allowed to reference the aliases of preceding join factors. This is a somewhat 
+surprising restriction that is motivated by the fact that in general such 
 arbitrary dependencies would force a join order. 
 
-Sometimes, however, they are necessary and a forced the join order is 
+Frequently, however, they are necessary and a forced the join order is 
 acceptable. Above LINQ query gets translated to this in Sql Server: 
 
     SELECT 
@@ -366,25 +373,26 @@ acceptable. Above LINQ query gets translated to this in Sql Server:
             WHERE [Extent2].[OrderNo] = [Extent1].[OrderNo] ) AS [Limit1]
 
 The `CROSS APPLY` is a rather young join type that allows the joined set to be 
-arbitrarily dependent on aliases of sibling joins. If the set isn't the cross 
+arbitrarily dependent on aliases of sibling joins. If the set isn't, the cross 
 apply behaves like a cross join. 
 
 There also is an `OUTER APPLY` that behaves analogously to an outer join. 
 
 (The example only selects the first invoice for every order as when one would 
-select all invoices, the query could be expressed by a simple join again by 
-moving the subquery's where into an on-clause - and Entity Framework does this 
-kind of optimization.) 
+select all invoices, the query could be simplified to a simple join by moving 
+the subquery's where clause predicate into an on-clause - and Entity Framework 
+does this kind of optimization.) 
 
 I could imaging that the cross apply was introduced precicely to make it 
 possible to have a nicer query language such as LINQ that does away with this 
 subtle bit of SQL weirdness - CROSS APPLY debuted in Sql Server 2005, LINQ in 
 Visual Studio 2008. It's now part of the SQL standard. 
 
-The feature is also supported by at least Oracle and PostgreSQL (for the 
-latter under the name *lateral join*).
+This important feature is also supported by at least Oracle and PostgreSQL 
+(for the latter under the name *lateral join*). 
 
-I would suggest staying closer to SQL with this syntax:
+As for the abstraction, however, I would suggest staying closer to SQL with this 
+syntax: 
 
     query(() => {
         const o = from(orders);
@@ -397,6 +405,10 @@ I would suggest staying closer to SQL with this syntax:
 
         return { o, i };
     })
+
+I think it makes more sense to get programmers to learn more about SQL than to 
+try and abstract away too much - in case of weird query execution problems, 
+they need to understand the SQL anyway.
 
 ### `GroupBy` and `GroupJoin`
 
@@ -478,7 +490,7 @@ in JavaScript specifically like this:
         return { orderNo, count, latestInvoice };
     })
 
-It's a more verbose than the LINQ version, but since it follows
+It's more verbose than the LINQ version, but since it follows
 SQL's concepts more closely
 
 - it expresses better what the resulting SQL will be like,
@@ -498,9 +510,9 @@ the rendered SQL it looks like this:
 
     SELECT { x: x1, y: { nested: n1 } } FROM ...
 
-Everything missing should be straight-forwared though. I don't
-expect any more surprises, although I do expect it to be *a lot*
-of work to be actually something usable.
+There is more that is considered in this readme and not yet implemented, but 
+all that should be straight-forward: I don't expect any more surprises. 
+However, I do expect it to be *a lot* of work to be a usable ORM.
 
 Since I don't see myself using JavaScript/TypeScript for database
 access right away, this is the point where my curiosity
