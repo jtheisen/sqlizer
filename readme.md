@@ -152,14 +152,14 @@ JavaScript has neither monads nor a LINQ query syntax, but I would like to
 suggest a workaround that would work in any language: the *pseudo-monadic 
 expression*: 
 
-    processQuery(query(() => {
+    query(() => {
         const o = from(orders);
         const i = from(o.invoices)
 
         where(not(o.isCancelled.eq(0)))
 
         return { o, i };
-    }))
+    })
 
 It's certainly very readable.
 
