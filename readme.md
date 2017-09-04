@@ -472,23 +472,23 @@ It's possible that there's an efficiency difference between the two. So
 in cases where it matters, the query author could write the latter
 in JavaScript specifically like this:
 
-    query(() => {
+    processQuery(query(() => {
         const orderNoWithInvoiceCount = query(() => {
             const i = from(invoices);
-            groupBy(i.OrderNo);
-            return { i.OrderNo, count: count() }
-        });
-        const { orderNo, count } = from(orderNoWithInvoiceCount)
+            groupBy(i.orderNo);
+            return { orderNo: i.orderNo, numberOfInvoices: count() }
+        })
+        const { orderNo, numberOfInvoices } = from(orderNoWithInvoiceCount)
         const latestInvoice = outerApply(query(() => {
-            const i2 = from(o.invoices)
-            where(i2.OrderNo.eq(o.OrderNo))
-            orderByDesc(i2.CreatedAt)
+            const i2 = from(invoices)
+            where(i2.orderNo.eq(orderNo))
+            orderByDesc(i2.createdAt)
             fetchOnly(1)
             return i2
         }))
 
-        return { orderNo, count, latestInvoice };
-    })
+        return { orderNo, numberOfInvoices, latestInvoice };
+    }))
 
 It's more verbose than the LINQ version, but since it follows
 SQL's concepts more closely
