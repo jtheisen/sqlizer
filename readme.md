@@ -514,6 +514,9 @@ There is more that is considered in this readme and not yet implemented, but
 all that should be straight-forward: I don't expect any more surprises. 
 However, I do expect it to be *a lot* of work to be a usable ORM.
 
+It may be possible to integrate this way of building queries into existing
+ORMs as there are no restrictions placed on the entity types.
+
 Since I don't see myself using JavaScript/TypeScript for database
 access right away, this is the point where my curiosity
 is satisfied for the time being.
