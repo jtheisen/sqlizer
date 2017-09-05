@@ -120,7 +120,7 @@ to `SqlElement`s. So for example, if you have a `SqlSet<Person>` then the
 `SqlElement<number>`. 
 
 The element types being `SqlElement`s is also an important safeguard against 
-the user accidently calling a function that, for example, expects a real 
+the user accidentally calling a function that, for example, expects a real 
 `Person` entity rather than meaning to contribute to an expression. 
 
 ## Pseudo-monadic expressions
@@ -266,7 +266,7 @@ elements:
 
 Nobody wants to write SQL itself, even if it was type-safe and would integrate 
 nicely into a host language like JavaScript. One wants at least *some* 
-abstraction on top of that, the most common for ORMs being implict joins 
+abstraction on top of that, the most common for ORMs being implicit joins 
 through navigational properties.
 
 On the other hand, it shouldn't be entirely mystical how the SQL is being 
@@ -277,7 +277,7 @@ something unusual, and for that we want to understand the SQL that led to it.
 ## We want to query graphs, not tables
 
 ORM query results are technically graphs (with relationships being the edges), 
-whereas SQL results are usually flat tables. Sql Server can indeed return 
+whereas SQL results are usually flat tables. SQL Server can indeed return 
 subgraphs (or rather subtrees, but that's close enough) by returning XML or 
 JSON, but I don't know to what extent that's common in other database servers. 
 
@@ -363,7 +363,7 @@ surprising restriction that is motivated by the fact that in general such
 arbitrary dependencies would force a join order. 
 
 Frequently, however, they are necessary and a forced the join order is 
-acceptable. Above LINQ query gets translated to this in Sql Server: 
+acceptable. Above LINQ query gets translated to this in SQL Server: 
 
     SELECT 
         ...
@@ -383,9 +383,9 @@ select all invoices, the query could be simplified to a simple join by moving
 the subquery's where clause predicate into an on-clause - and Entity Framework 
 does this kind of optimization.) 
 
-I could imaging that the cross apply was introduced precicely to make it 
+I could imaging that the cross apply was introduced precisely to make it 
 possible to have a nicer query language such as LINQ that does away with this 
-subtle bit of SQL weirdness - CROSS APPLY debuted in Sql Server 2005, LINQ in 
+subtle bit of SQL weirdness - CROSS APPLY debuted in SQL Server 2005, LINQ in 
 Visual Studio 2008. It's now part of the SQL standard. 
 
 This important feature is also supported by at least Oracle and PostgreSQL 
