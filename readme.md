@@ -44,20 +44,20 @@ that matter) that plays in LINQ/Entity Frameworks league.
 I want at least:
 
 * Type-safety when using TypeScript (on the *data model* when building 
-  queries, not just the ORM's API) 
+  queries, not just the ORM's API).
 * Queries should look elegant and be easily comprehensible (especially joins 
   and infix operators make our lives difficult without special language 
-  support) 
+  support).
 * Arbitrary result set types, not just sets of predefined model types 
   (sometimes called "projections") as shown in the teaser; we can live with 
-  not being able to write back rows fetched that way 
+  not being able to write back rows fetched that way.
 * The resulting SQL should be readable for the sake of the debugging 
   that will be necessary on occasion. For the same reason, it is beneficial 
   when the structure of the original query is still recognizable in the 
   resulting SQL. 
 
 I've written the beginning of a query builder that could be used as research 
-for a something more serious in the future. It's not usable yet in any way, 
+for something more serious in the future. It's not usable yet in any way, 
 but I think I got most of the tricky stuff working to prove that the type 
 inference and runtime query building really works the way as I describe in 
 this readme. I will call this *Sqlizer* to have  a name for it that isn't
