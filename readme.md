@@ -362,7 +362,7 @@ allowed to reference the aliases of preceding join factors. This is a somewhat
 surprising restriction that is motivated by the fact that in general such 
 arbitrary dependencies would force a join order. 
 
-Frequently, however, they are necessary and a forced the join order is 
+Frequently, however, they are necessary and a forced join order is 
 acceptable. Above LINQ query gets translated to this in SQL Server: 
 
     SELECT 
